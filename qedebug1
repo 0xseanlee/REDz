@@ -1,0 +1,80 @@
+local HttpService = game:GetService("HttpService")
+
+-- 【設定區】
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+print("--- [1] 腳本啟動成功 ---")
+
+-- 檢查執行器環境
+local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+if request then
+    print("--- [2] 環境檢測：執行器支援 Http Request ---")
+else
+    warn("--- [2] 環境檢測：❌ 錯誤！你的執行器不支援發送請求 ---")
+end
+
+-- 封裝測試發送函數
+local function DebugSend(title, content)
+    print("--- [步驟] 嘗試發送數據到 Discord: " .. title .. " ---")
+    
+    local success, err = pcall(function()
+        request({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({
+                embeds = {{
+                    title = "🛠️ 調試訊息: " .. title,
+                    description = content,
+                    color = 0xFFAA00
+                }}
+            })
+        })
+    end)
+    
+    if success then
+        print("--- [結果] ✅ " .. title .. " 發送指令已執行 ---")
+    else
+        warn("--- [結果] ❌ 發送失敗，報錯原因: " .. tostring(err) .. " ---")
+    end
+end
+
+-- 立即測試 Webhook 是否連通
+DebugSend("初始連線測試", "如果你看到這則訊息，代表 Webhook 網址與網路權限正常。")
+
+-- 監聽對話邏輯
+print("--- [3] 開始掛鉤 (Hooking) 遊戲通訊協議 ---")
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- 監控 CommF_
+    if tostring(self) == "CommF_" and method == "InvokeServer" then
+        if args[1] == "GetQuests" or args[1] == "CheckQuest" then
+            print("--- [4] 偵測到觸發 NPC 對話！正在攔截數據... ---")
+            
+            task.spawn(function()
+                local result = self:InvokeServer(unpack(args))
+                if result and type(result) == "table" then
+                    print("--- [5] 成功解析 Table 數據，準備格式化 ---")
+                    
+                    local list = "local QuestData = {\n"
+                    for _, q in pairs(result) do
+                        list = list .. string.format('    ["%s"] = {LevelReq = %s},\n', tostring(q.Name), tostring(q.LevelReq or 0))
+                    end
+                    list = list .. "}"
+                    
+                    print("--- [6] 數據格式化完成，發送至 Discord ---")
+                    DebugSend("任務數據抓取成功", "```lua\n" .. list .. "\n```")
+                else
+                    warn("--- [5] ❌ 攔截失敗：伺服器回傳了空數據或非 Table 格式 ---")
+                end
+            end)
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+
+print("--- [4] 監聽中... 請現在去點擊 NPC 對話框 ---")
