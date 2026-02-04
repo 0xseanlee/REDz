@@ -1,5 +1,4 @@
 local UIS = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
 -- 【設定區】
@@ -10,63 +9,57 @@ local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fL
 local LastChatMessage = "未命名座標"
 local Locations = {}
 
--- 監聽聊天 (修正版：確保能抓到玩家自己的訊息)
+-- 執行器專用發送函數 (兼容多種執行器)
+local function SendToDiscord(payload)
+    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
+    if request then
+        request({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = game:GetService("HttpService"):JSONEncode(payload)
+        })
+    else
+        warn("❌ 你的執行器不支持 http_request 函數")
+    end
+end
+
+-- 監聽聊天
 Players.LocalPlayer.Chatted:Connect(function(msg)
     LastChatMessage = msg
-    print("📍 下一個座標備註已設為: " .. msg)
+    print("📍 備註已更新: " .. msg)
 end)
 
--- 執行記錄功能
+-- 記錄功能
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
     if input.KeyCode == LogKey then
-        local character = Players.LocalPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-        
+        local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if root then
             local cf = root.CFrame
-            -- 格式化為精簡的代碼格式
-            local posString = string.format("CFrame.new(%.2f, %.2f, %.2f)", cf.Position.X, cf.Position.Y, cf.Position.Z)
-            
-            table.insert(Locations, {
-                Note = LastChatMessage,
-                Code = posString
-            })
-            print("✅ 已記錄 [" .. LastChatMessage .. "]")
+            local posString = string.format("CFrame.new(%.2f, %.2f, %.2f)", cf.X, cf.Y, cf.Z)
+            table.insert(Locations, {Note = LastChatMessage, Code = posString})
+            print("✅ 錄入: " .. LastChatMessage)
         end
 
     elseif input.KeyCode == SendKey then
-        if #Locations == 0 then 
-            print("⚠️ 清單是空的，沒什麼好發送的。") 
-            return 
-        end
-
-        -- 構建 Discord 訊息內容
-        local msgTable = {
-            ["embeds"] = {{
-                ["title"] = "📍 座標採集報告",
-                ["description"] = "```lua\nlocal Locations = {\n",
-                ["color"] = 65280 -- 綠色
-            }}
-        }
-
+        if #Locations == 0 then return end
+        
+        local desc = "```lua\nlocal Locations = {\n"
         for _, item in ipairs(Locations) do
-            msgTable.embeds[1].description = msgTable.embeds[1].description .. '    ["' .. item.Note .. '"] = ' .. item.Code .. ",\n"
+            desc = desc .. '    ["' .. item.Note .. '"] = ' .. item.Code .. ",\n"
         end
-        msgTable.embeds[1].description = msgTable.embeds[1].description .. "}\n```"
+        desc = desc .. "}\n```"
 
-        -- 發送請求 (使用 pcall 防止噴錯)
-        local success, response = pcall(function()
-            return HttpService:PostAsync(WebhookURL, HttpService:JSONEncode(msgTable))
-        end)
-
-        if success then
-            print("🚀 數據已成功送達 Discord！")
-            Locations = {} -- 清空緩存
-        else
-            warn("❌ 發送失敗！原因: " .. tostring(response))
-            print("請檢查是否開啟了 Allow HTTP Requests 或 Webhook 網址是否正確。")
-        end
+        SendToDiscord({
+            embeds = {{
+                title = "📍 採集到的座標清單",
+                description = desc,
+                color = 0x00ff00
+            }}
+        })
+        print("🚀 已發送到 Discord")
+        Locations = {} 
     end
 end)
