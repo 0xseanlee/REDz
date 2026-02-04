@@ -1,0 +1,62 @@
+local HttpService = game:GetService("HttpService")
+local player = game.Players.LocalPlayer
+
+-- 【請確認 Webhook 正確】
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+print("--- [Mac 穩定版] 任務採集器已啟動 ---")
+
+-- 1. 萬用發送函數 (自動偵測 Mac 執行器函數)
+local function MacSend(content)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        task.spawn(function()
+            local success, err = pcall(function()
+                req({
+                    Url = WebhookURL,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode({content = content})
+                })
+            end)
+            if success then print("✅ Discord 訊息已送出") else warn("❌ Webhook 錯誤: " .. tostring(err)) end
+        end)
+    else
+        warn("⚠️ 找不到可用的 Request 函數，請檢查執行器權限")
+    end
+end
+
+-- 2. 初始測試（執行後 Discord 應該立刻收到訊息）
+MacSend("🚀 Mac 採集器已連線！目前的等級: " .. player.Data.Level.Value)
+
+-- 3. UI 掃描邏輯 (避開 Hooking 報錯)
+local lastLog = ""
+task.spawn(function()
+    while task.wait(1.5) do
+        -- 判斷任務選單是否打開
+        local mainGui = player.PlayerGui:FindFirstChild("Main")
+        local questGui = mainGui and mainGui:FindFirstChild("Quest")
+        
+        if questGui and questGui.Visible then
+            local container = questGui:FindFirstChild("Container")
+            if container then
+                local foundText = "📍 偵測到任務選項：\n"
+                local hasTasks = false
+                
+                for _, item in pairs(container:GetChildren()) do
+                    if item:IsA("TextButton") and item.Text ~= "" then
+                        foundText = foundText .. "- " .. item.Text .. "\n"
+                        hasTasks = true
+                    end
+                end
+                
+                -- 比對是否為新內容
+                if hasTasks and foundText ~= lastLog then
+                    lastLog = foundText
+                    print("🎯 捕捉成功！")
+                    MacSend("```\n" .. foundText .. "\n```")
+                end
+            end
+        end
+    end
+end)
