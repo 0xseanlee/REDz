@@ -1,0 +1,64 @@
+local player = game.Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+
+-- --- UI 建立 ---
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoM1_UI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false -- 角色死掉 UI 不會消失
+
+local mainButton = Instance.new("TextButton")
+mainButton.Size = UDim2.new(0, 120, 0, 50)
+mainButton.Position = UDim2.new(0, 50, 0.5, 0) -- 螢幕左側中間
+mainButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- 初始紅色
+mainButton.Text = "M1: OFF"
+mainButton.TextColor3 = Color3.new(1, 1, 1)
+mainButton.Font = Enum.Font.SourceSansBold
+mainButton.TextSize = 20
+mainButton.Parent = screenGui
+
+-- 圓角效果
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainButton
+
+-- --- 邏輯功能 ---
+getgenv().AutoM1_Toggle = false
+
+-- 點擊切換開關
+mainButton.MouseButton1Click:Connect(function()
+    getgenv().AutoM1_Toggle = not getgenv().AutoM1_Toggle
+    
+    if getgenv().AutoM1_Toggle then
+        mainButton.Text = "M1: ON"
+        mainButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50) -- 變成綠色
+        print("✅ 自動普攻開啟")
+    else
+        mainButton.Text = "M1: OFF"
+        mainButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- 變成紅色
+        print("🛑 自動普攻關閉")
+    end
+end)
+
+-- --- 核心穩定普攻循環 ---
+task.spawn(function()
+    while true do
+        if getgenv().AutoM1_Toggle then
+            pcall(function()
+                local char = player.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                
+                if tool then
+                    -- 使用 VirtualUser 點擊螢幕中心
+                    vUser:CaptureController()
+                    vUser:Button1Down(Vector2.new(640, 360)) 
+                    
+                    -- 同步激活工具
+                    tool:Activate()
+                end
+            end)
+        end
+        -- 設定為「慢慢的」速度：每 0.25 秒揮一次 (適合大多數武器節奏)
+        task.wait(0.25) 
+    end
+end)
