@@ -1,0 +1,48 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- 【根據數據報告設定】
+local QuestConfig = {
+    RemoteName = "CommF_",             -- 數據報告顯示的通訊協議核心
+    QuestName = "Quest1",         -- 一海猴子任務的系統內部名稱
+    QuestLevel = 1,                    -- 第一個選項 (Monkeys)
+    CheckDelay = 5                     -- 每 5 秒檢查一次
+}
+
+print("--- 🚀 [一海自動化] 正在針對 BM_20SHOP7202 啟動接任務功能 ---")
+
+-- 函數：檢查當前任務狀態 (根據你的數據報告邏輯)
+local function IsQuestActive()
+    local mainGui = player.PlayerGui:FindFirstChild("Main")
+    local questGui = mainGui and mainGui:FindFirstChild("Quest")
+    -- 如果 Quest 視窗是可見的，代表任務進行中
+    return questGui and questGui.Visible
+end
+
+-- 核心自動循環
+task.spawn(function()
+    while true do
+        local success, err = pcall(function()
+            if not IsQuestActive() then
+                print("📍 偵測到無任務，正在遠端接取: Monkeys")
+                
+                -- 取得通訊遠端
+                local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild(QuestConfig.RemoteName)
+                
+                -- 執行接任務指令
+                -- 參數 1: "AcceptQuest" (動作)
+                -- 參數 2: "JungleQuest" (任務組名)
+                -- 參數 3: 1 (任務序號，即 Monkey)
+                remote:InvokeServer("AcceptQuest", QuestConfig.QuestName, QuestConfig.QuestLevel)
+                
+                print("✅ 已成功發送接取請求")
+            end
+        end)
+        
+        if not success then
+            warn("❌ 自動接任務發生錯誤: " .. tostring(err))
+        end
+        
+        task.wait(QuestConfig.CheckDelay)
+    end
+end)
