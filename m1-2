@@ -1,0 +1,76 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- --- UI 建立 (遵循規範) ---
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ServerCombat_Pro"
+screenGui.Parent = player.PlayerGui
+screenGui.ResetOnSpawn = false
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 160, 0, 50)
+btn.Position = UDim2.new(0, 40, 0.4, 0)
+btn.Text = "FORCE SERVER: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Parent = screenGui
+Instance.new("UICorner").Parent = btn
+
+-- --- 核心功能開關 ---
+_G.AttackActive = false
+
+btn.MouseButton1Click:Connect(function()
+    _G.AttackActive = not _G.AttackActive
+    btn.Text = _G.AttackActive and "FORCE SERVER: ON" or "FORCE SERVER: OFF"
+    btn.BackgroundColor3 = _G.AttackActive and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(35, 35, 35)
+end)
+
+-- --- 攻擊循環 (採用專業開發者建議優化) ---
+task.spawn(function()
+    local commF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+    
+    while true do
+        if _G.AttackActive then
+            local success, err = pcall(function()
+                local char = player.Character
+                -- 1. 空值檢查：確保角色與目標物件存在
+                if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+                
+                local tool = char:FindFirstChildOfClass("Tool")
+                -- 2. 裝備檢查：確保伺服器認為你正手持武器
+                if tool and tool:FindFirstChild("Handle") then
+                    
+                    -- 3. 距離篩選：只對最近的合理目標進行運算，節省效能
+                    for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+                        local enemyRoot = enemy:FindFirstChild("HumanoidRootPart")
+                        local enemyHum = enemy:FindFirstChild("Humanoid")
+                        
+                        -- 4. 健康檢查：死掉的怪不發送協議
+                        if enemyRoot and enemyHum and enemyHum.Health > 0 then
+                            local dist = (char.HumanoidRootPart.Position - enemyRoot.Position).Magnitude
+                            
+                            -- 只有在 40 格內的合法距離才動作
+                            if dist < 40 then
+                                -- 5. 使用 FireServer 避免 InvokeServer 造成的阻塞
+                                -- 發送基礎攻擊宣告
+                                commF:FireServer("Attack")
+                                
+                                -- 6. 發送命中確認，這是讓伺服器結算傷害的關鍵
+                                -- 這裡傳送 enemy 是針對一海 Remotes 的常見調用方式
+                                commF:FireServer("SwordHit", enemyRoot.CFrame, {[1] = enemy})
+                            end
+                        end
+                    end
+                end
+            end)
+            
+            if not success then 
+                -- 7. 錯誤回傳：不再默默吃掉報錯
+                warn("Combat Error: " .. tostring(err)) 
+            end
+        end
+        
+        -- 8. 隨機化間隔：0.35s ~ 0.5s 避開反作弊偵測，且不快過武器冷卻
+        task.wait(math.random(35, 50) / 100)
+    end
+end)
