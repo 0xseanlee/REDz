@@ -1,0 +1,41 @@
+local player = game.Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+
+print("--- ⚔️ 啟動暴力普攻測試 (三重驅動模式) ---")
+
+-- 開啟一個獨立線程執行普攻
+_G.AutoClickTest = true -- 設定開關，方便隨時停止
+
+task.spawn(function()
+    while _G.AutoClickTest do
+        local success, err = pcall(function()
+            -- 確保角色還活著
+            local character = player.Character
+            if not character then return end
+            
+            -- 尋找目前手上拿著的工具
+            local tool = character:FindFirstChildOfClass("Tool")
+            
+            if tool then
+                -- 【驅動 1】：虛擬按鍵模擬 (最常用)
+                vUser:CaptureController()
+                vUser:Button1Down(Vector2.new(1280, 672))
+                
+                -- 【驅動 2】：工具直接激活 (針對 Mac 執行器優化)
+                tool:Activate()
+                
+                -- 【驅動 3】：繞過 UI 層直接呼叫攻擊動作
+                -- 這是某些遊戲底層支援的點擊方式
+                vUser:ClickButton1(Vector2.new(1280, 672))
+            else
+                print("⚠️ 請先手動裝備武器！")
+            end
+        end)
+        
+        if not success then warn("普攻報錯: " .. err) end
+        
+        task.wait(0.1) -- 攻速間隔
+    end
+end)
+
+print("✅ 測試腳本已運行。如需停止，請在控制台輸入: _G.AutoClickTest = false")
