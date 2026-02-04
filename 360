@@ -3,7 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = game.Players.LocalPlayer
 
 -- 【參數設定】
-local SPEED = 360 -- 滑行速度，300-350 是相對安全的極限
+local SPEED = 400 -- 滑行速度，300-350 是相對安全的極限
 local NPC_POS = CFrame.new(1386, 87, -1298) -- 雪地島 NPC 座標
 
 print("--- ✈️ [防拉回系統] 啟動極速滑行測試 ---")
