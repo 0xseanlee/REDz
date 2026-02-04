@@ -1,0 +1,54 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- --- UI 開關 ---
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+screenGui.ResetOnSpawn = false
+local btn = Instance.new("TextButton", screenGui)
+btn.Size = UDim2.new(0, 160, 0, 50)
+btn.Position = UDim2.new(0, 50, 0.4, 0)
+btn.Text = "SERVER HIT: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", btn)
+
+_G.ServerAttack = false
+btn.MouseButton1Click:Connect(function()
+    _G.ServerAttack = not _G.ServerAttack
+    btn.Text = _G.ServerAttack and "SERVER HIT: ON" or "SERVER HIT: OFF"
+    btn.BackgroundColor3 = _G.ServerAttack and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(30, 30, 30)
+end)
+
+-- --- 核心：直接通訊協定 ---
+task.spawn(function()
+    while true do
+        if _G.ServerAttack then
+            pcall(function()
+                local char = player.Character
+                -- 取得當前工具，這決定了伺服器是否接受該協議
+                local tool = char:FindFirstChildOfClass("Tool")
+                
+                if tool then
+                    -- 掃描範圍內的 NPC
+                    for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+                        if enemy:FindFirstChild("HumanoidRootPart") and enemy.Humanoid.Health > 0 then
+                            local distance = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                            
+                            -- 只有在合理範圍內 (40格)，伺服器才會驗證通過
+                            if distance < 40 then
+                                -- 1. 先送出攻擊宣告
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack")
+                                
+                                -- 2. 立即送出命中協議 (這是重點，決定了 Server 端的傷害輸出)
+                                -- 參數 1: 命中座標, 參數 2: 命中對象列表
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("SwordHit", enemy.HumanoidRootPart.CFrame, {[1] = enemy})
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        -- 配合伺服器驗證頻率，不宜過快以防被踢
+        task.wait(0.3)
+    end
+end)
