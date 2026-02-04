@@ -2,23 +2,60 @@ local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- 你提供的清單
+-- 1. 這是你的座標數據庫
 local Locations = {
     ["Jungle Quests"] = CFrame.new(-1596.43, 37.19, 154.34),
     ["Blox Fruit Gacha"] = CFrame.new(-1438.35, 62.19, 4.75),
 }
 
--- 瞬移函數
-local function teleportTo(locationName)
-    local targetCFrame = Locations[locationName]
-    if targetCFrame then
-        rootPart.CFrame = targetCFrame
-        print("已到達: " .. locationName)
-    else
-        warn("找不到名為 " .. locationName .. " 的座標")
-    end
+-- 2. 創建簡單的 UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TeleportGui"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 300)
+frame.Position = UDim2.new(0, 50, 0.5, -150)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 2
+frame.Active = true
+frame.Draggable = true -- 讓你可以拖動介面
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "座標傳送器"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+title.Parent = frame
+
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Size = UDim2.new(1, 0, 1, -30)
+scrollingFrame.Position = UDim2.new(0, 0, 0, 30)
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- 會根據按鈕數量自動調整
+scrollingFrame.Parent = frame
+
+local layout = Instance.new("UIListLayout")
+layout.Parent = scrollingFrame
+layout.Padding = UDim.new(0, 5)
+
+-- 3. 自動根據清單生成按鈕
+local count = 0
+for name, cf in pairs(Locations) do
+    count = count + 1
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 40)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Parent = scrollingFrame
+    
+    -- 點擊事件
+    btn.MouseButton1Click:Connect(function()
+        rootPart.CFrame = cf
+        print("已傳送到: " .. name)
+    end)
 end
 
--- 測試：5秒後瞬移到扭蛋機
-task.wait(5)
-teleportTo("Blox Fruit Gacha")
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, count * 45)
+print("UI 已加載，共 " .. count .. " 個點位")
