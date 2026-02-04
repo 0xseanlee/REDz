@@ -1,0 +1,43 @@
+local player = game.Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+
+-- --- UI 介面 ---
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+screenGui.ResetOnSpawn = false
+local btn = Instance.new("TextButton", screenGui)
+btn.Size = UDim2.new(0, 150, 0, 50)
+btn.Position = UDim2.new(0, 50, 0.4, 0)
+btn.Text = "穩定普攻: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+Instance.new("UICorner", btn)
+
+getgenv().SlowM1 = false
+btn.MouseButton1Click:Connect(function()
+    getgenv().SlowM1 = not getgenv().SlowM1
+    btn.Text = getgenv().SlowM1 and "穩定普攻: ON" or "穩定普攻: OFF"
+    btn.BackgroundColor3 = getgenv().SlowM1 and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(100, 100, 100)
+end)
+
+-- --- 核心：模擬真實點擊 ---
+task.spawn(function()
+    while true do
+        if getgenv().SlowM1 then
+            pcall(function()
+                local char = player.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                
+                if tool then
+                    -- 必須先 Capture 視窗焦點
+                    vUser:CaptureController()
+                    
+                    -- 執行一次完整的點擊循環：按下 -> 停留 -> 放開
+                    vUser:Button1Down(Vector2.new(640, 360))
+                    task.wait(0.05) -- 模擬手指按下的停留時間
+                    vUser:Button1Up(Vector2.new(640, 360))
+                end
+            end)
+        end
+        -- 增加間隔至 0.4 秒，確保物理武器的冷卻與動畫能被伺服器接受
+        task.wait(0.4) 
+    end
+end)
