@@ -2,69 +2,71 @@ local UIS = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
--- 設定區
-local LogKey = Enum.KeyCode.P      -- 按下 P 記錄
-local SendKey = Enum.KeyCode.Y     -- 按下 Y 發送到 Discord
+-- 【設定區】
+local LogKey = Enum.KeyCode.P
+local SendKey = Enum.KeyCode.Y
 local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
 
-local LastChatMessage = "無備註"
+local LastChatMessage = "未命名座標"
 local Locations = {}
 
-print("--- 座標採集器已啟動 ---")
-print("1. 在聊天框輸入 NPC 名稱或用途")
-print("2. 按下 'P' 記錄座標與備註")
-print("3. 按下 'Y' 將所有清單發送至 Discord")
-
--- 監聽聊天訊息
+-- 監聽聊天 (修正版：確保能抓到玩家自己的訊息)
 Players.LocalPlayer.Chatted:Connect(function(msg)
     LastChatMessage = msg
-    print("當前備註已更新為: " .. msg)
+    print("📍 下一個座標備註已設為: " .. msg)
 end)
 
--- 記錄功能
+-- 執行記錄功能
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
-    -- 按下 P 記錄
     if input.KeyCode == LogKey then
-        local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local character = Players.LocalPlayer.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        
         if root then
             local cf = root.CFrame
-            local posString = string.format("CFrame.new(%.2f, %.2f, %.2f)", cf.X, cf.Y, cf.Z)
+            -- 格式化為精簡的代碼格式
+            local posString = string.format("CFrame.new(%.2f, %.2f, %.2f)", cf.Position.X, cf.Position.Y, cf.Position.Z)
             
-            local data = {
+            table.insert(Locations, {
                 Note = LastChatMessage,
                 Code = posString
-            }
-            table.insert(Locations, data)
-            print("✅ 已記錄: " .. LastChatMessage .. " -> " .. posString)
+            })
+            print("✅ 已記錄 [" .. LastChatMessage .. "]")
         end
 
-    -- 按下 Y 發送 Webhook
     elseif input.KeyCode == SendKey then
-        if #Locations == 0 then print("❌ 清單為空，無法發送") return end
-        
-        local content = "📍 **新採集的 Blox Fruit 座標清單**:\n```lua\nlocal Locations = {\n"
-        for _, item in ipairs(Locations) do
-            content = content .. '    ["' .. item.Note .. '"] = ' .. item.Code .. ",\n"
+        if #Locations == 0 then 
+            print("⚠️ 清單是空的，沒什麼好發送的。") 
+            return 
         end
-        content = content .. "}\n```"
 
-        local payload = HttpService:JSONEncode({
-            content = content,
-            username = "座標採集助手"
-        })
+        -- 構建 Discord 訊息內容
+        local msgTable = {
+            ["embeds"] = {{
+                ["title"] = "📍 座標採集報告",
+                ["description"] = "```lua\nlocal Locations = {\n",
+                ["color"] = 65280 -- 綠色
+            }}
+        }
 
-        -- 發送 POST 請求
-        local success, err = pcall(function()
-            HttpService:PostAsync(WebhookURL, payload)
+        for _, item in ipairs(Locations) do
+            msgTable.embeds[1].description = msgTable.embeds[1].description .. '    ["' .. item.Note .. '"] = ' .. item.Code .. ",\n"
+        end
+        msgTable.embeds[1].description = msgTable.embeds[1].description .. "}\n```"
+
+        -- 發送請求 (使用 pcall 防止噴錯)
+        local success, response = pcall(function()
+            return HttpService:PostAsync(WebhookURL, HttpService:JSONEncode(msgTable))
         end)
 
         if success then
-            print("🚀 數據已成功發送到 Discord！")
-            Locations = {} -- 發送後清空，避免重複發送
+            print("🚀 數據已成功送達 Discord！")
+            Locations = {} -- 清空緩存
         else
-            print("⚠️ 發送失敗: " .. tostring(err))
+            warn("❌ 發送失敗！原因: " .. tostring(response))
+            print("請檢查是否開啟了 Allow HTTP Requests 或 Webhook 網址是否正確。")
         end
     end
 end)
