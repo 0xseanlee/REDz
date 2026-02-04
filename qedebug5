@@ -1,0 +1,41 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+
+-- 【設定區】
+local QuestName = "JungleQuest1" -- 這裡填入你之前抓到的任務名稱
+local QuestLevel = 1             -- 任務序號 (通常是 1)
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+-- 執行器專用 Request 函數 (修正圖一的 Http 錯誤)
+local function MacRequest(data)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        req({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end
+end
+
+-- 【核心功能：自動接任務】
+local function AcceptQuest(name, level)
+    print("--- 正在嘗試遠程接取任務: " .. name .. " ---")
+    
+    -- Blox Fruit 的標準通訊路徑
+    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+    
+    -- 直接呼叫伺服器協議
+    local result = remote:InvokeServer("AcceptQuest", name, level)
+    
+    if result == 1 or result == true then
+        print("✅ 任務接取成功！")
+        MacRequest({content = "🎮 成功接取任務: **" .. name .. "**"})
+    else
+        warn("❌ 任務接取失敗，可能是等級不足或已經有任務了")
+    end
+end
+
+-- 執行
+AcceptQuest(QuestName, QuestLevel)
