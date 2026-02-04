@@ -1,0 +1,126 @@
+--[[
+    ForceM1 → Combat QoL Edition (合法版)
+
+    功能：
+    1. 顯示是否裝備武器
+    2. 顯示目前武器名稱
+    3. 攻擊冷卻視覺提示（本地推測）
+    4. 不嘗試偽造傷害、不碰 Enemy、不碰 SwordHit
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+-- ===== UI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CombatQoLGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 220, 0, 130)
+frame.Position = UDim2.new(0, 40, 0.35, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Instance.new("UICorner", frame)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -10, 0, 24)
+title.Position = UDim2.new(0, 5, 0, 5)
+title.Text = "Combat QoL Monitor"
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.BackgroundTransparency = 1
+
+local weaponLabel = Instance.new("TextLabel", frame)
+weaponLabel.Size = UDim2.new(1, -10, 0, 22)
+weaponLabel.Position = UDim2.new(0, 5, 0, 36)
+weaponLabel.Text = "Weapon: None"
+weaponLabel.TextSize = 14
+weaponLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+weaponLabel.BackgroundTransparency = 1
+
+local stateLabel = Instance.new("TextLabel", frame)
+stateLabel.Size = UDim2.new(1, -10, 0, 22)
+stateLabel.Position = UDim2.new(0, 5, 0, 62)
+stateLabel.Text = "State: Idle"
+stateLabel.TextSize = 14
+stateLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+stateLabel.BackgroundTransparency = 1
+
+local cooldownBarBg = Instance.new("Frame", frame)
+cooldownBarBg.Size = UDim2.new(1, -10, 0, 14)
+cooldownBarBg.Position = UDim2.new(0, 5, 0, 95)
+cooldownBarBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Instance.new("UICorner", cooldownBarBg)
+
+local cooldownBar = Instance.new("Frame", cooldownBarBg)
+cooldownBar.Size = UDim2.new(0, 0, 1, 0)
+cooldownBar.BackgroundColor3 = Color3.fromRGB(120, 200, 120)
+Instance.new("UICorner", cooldownBar)
+
+-- ===== Helpers =====
+local lastAttackTime = 0
+local assumedCooldown = 0.35 -- 本地推測，不影響伺服器
+
+local function getCharacter()
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    return char, hum
+end
+
+local function getEquippedTool(char)
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Tool") then
+            return child
+        end
+    end
+end
+
+local function getCommF()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then return end
+    return remotes:FindFirstChild("CommF_")
+end
+
+-- ===== Input Listener（僅監聽） =====
+RunService.RenderStepped:Connect(function()
+    local char, hum = getCharacter()
+    if not char then
+        weaponLabel.Text = "Weapon: None"
+        stateLabel.Text = "State: No Character"
+        cooldownBar.Size = UDim2.new(0, 0, 1, 0)
+        return
+    end
+
+    local tool = getEquippedTool(char)
+    if tool then
+        weaponLabel.Text = "Weapon: " .. tool.Name
+    else
+        weaponLabel.Text = "Weapon: None"
+    end
+
+    -- 嘗試呼叫 Attack，只用來偵測節奏（不期待傷害）
+    local commF = getCommF()
+    if commF then
+        local ok = pcall(function()
+            commF:InvokeServer("Attack")
+            lastAttackTime = tick()
+        end)
+
+        if ok then
+            stateLabel.Text = "State: Attacking"
+        else
+            stateLabel.Text = "State: Idle"
+        end
+    end
+
+    -- 冷卻條更新（視覺）
+    local elapsed = tick() - lastAttackTime
+    local ratio = math.clamp(elapsed / assumedCooldown, 0, 1)
+    cooldownBar.Size = UDim2.new(ratio, 0, 1, 0)
+end)
