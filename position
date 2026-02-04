@@ -2,14 +2,15 @@ local UIS = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
 -- 【設定區】
-local LogKey = Enum.KeyCode.P
-local SendKey = Enum.KeyCode.Y
+local LogKey = Enum.KeyCode.P      -- 記錄座標
+local SendKey = Enum.KeyCode.Y     -- 發送到 Discord
+local ClearKey = Enum.KeyCode.T    -- 【新功能】清空目前清單
 local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
 
 local LastChatMessage = "未命名座標"
 local Locations = {}
 
--- 執行器專用發送函數 (兼容多種執行器)
+-- 執行器專用發送函數
 local function SendToDiscord(payload)
     local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
     if request then
@@ -27,24 +28,34 @@ end
 -- 監聽聊天
 Players.LocalPlayer.Chatted:Connect(function(msg)
     LastChatMessage = msg
-    print("📍 備註已更新: " .. msg)
+    print("📍 備註已更新為: " .. msg)
 end)
 
--- 記錄功能
+-- 按鍵判定
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
+    -- 【P】記錄座標
     if input.KeyCode == LogKey then
         local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if root then
             local cf = root.CFrame
             local posString = string.format("CFrame.new(%.2f, %.2f, %.2f)", cf.X, cf.Y, cf.Z)
             table.insert(Locations, {Note = LastChatMessage, Code = posString})
-            print("✅ 錄入: " .. LastChatMessage)
+            print("✅ 已錄入 (" .. #Locations .. "): " .. LastChatMessage)
         end
 
+    -- 【T】清空清單
+    elseif input.KeyCode == ClearKey then
+        Locations = {}
+        print("🗑️ 清單已完全清空！可以重新開始記錄。")
+
+    -- 【Y】發送到 Discord
     elseif input.KeyCode == SendKey then
-        if #Locations == 0 then return end
+        if #Locations == 0 then 
+            print("⚠️ 目前沒有任何座標可以發送")
+            return 
+        end
         
         local desc = "```lua\nlocal Locations = {\n"
         for _, item in ipairs(Locations) do
@@ -54,12 +65,17 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 
         SendToDiscord({
             embeds = {{
-                title = "📍 採集到的座標清單",
+                title = "📍 批量採集座標報告",
                 description = desc,
-                color = 0x00ff00
+                color = 0x00ff00,
+                footer = { text = "由座標採集助手發送 • 總計 " .. #Locations .. " 個點位" }
             }}
         })
-        print("🚀 已發送到 Discord")
+        
+        print("🚀 數據已成功發送到 Discord，清單已自動重設。")
         Locations = {} 
     end
 end)
+
+print("--- 強化版座標工具 ---")
+print("P: 記錄 | T: 清空 | Y: 發送")
