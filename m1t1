@@ -1,0 +1,48 @@
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 設定全域變數開關，方便你隨時關閉
+getgenv().AutoM1_Active = true
+
+print("--- ⚔️ 啟動極速普攻系統 (RenderStepped 驅動) ---")
+print("若要停止，請執行: getgenv().AutoM1_Active = false")
+
+-- 定義核心攻擊函數
+local function AttemptAttack()
+    -- 1. 確保角色存在
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    -- 2. 獲取當前手持的工具
+    local tool = character:FindFirstChildOfClass("Tool")
+    
+    if tool then
+        -- 【方案 A】: VirtualUser 模擬滑鼠左鍵 (最標準的方法)
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:Button1Down(Vector2.new(0, 0))
+        end)
+        
+        -- 【方案 B】: 強制激活工具 (針對 Mac 執行器模擬失效的備案)
+        pcall(function()
+            tool:Activate()
+        end)
+    end
+end
+
+-- 使用 RenderStepped 綁定每一幀
+-- 這比 while wait() 快得多，且不會造成腳本延遲
+local attackConnection
+attackConnection = RunService.RenderStepped:Connect(function()
+    if not getgenv().AutoM1_Active then
+        if attackConnection then 
+            attackConnection:Disconnect()
+            print("🛑 自動普攻已停止")
+        end
+        return
+    end
+    
+    AttemptAttack()
+end)
