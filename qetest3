@@ -1,0 +1,41 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+local root = player.Character.HumanoidRootPart
+
+-- 【雪地島精確座標與設定】
+local Config = {
+    QuestName = "SnowQuest", -- 偵測出的系統名稱
+    QuestID = 1,             -- Snow Bandits 序號
+    MonsterPos = Vector3.new(1389, 105, -1298), -- 雪地怪刷新點座標
+    Weapon = "Cursed Dual Katana"               -- 裝備你的 CDK
+}
+
+print("--- ❄️ 雪地島自動循環啟動 (BM_20SHOP7202) ---")
+
+-- 1. 自動裝備 CDK
+local function EquipWeapon()
+    local tool = player.Backpack:FindFirstChild(Config.Weapon)
+    if tool then player.Character.Humanoid:EquipTool(tool) end
+end
+
+-- 2. 核心自動化邏輯
+task.spawn(function()
+    while task.wait(0.5) do
+        local questUI = player.PlayerGui.Main:FindFirstChild("Quest")
+        
+        if questUI and not questUI.Visible then
+            -- A: 沒任務時，遠程接取 SnowQuest
+            print("📍 接取 SnowQuest...")
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("AcceptQuest", Config.QuestName, Config.QuestID)
+        else
+            -- B: 有任務時，飛往怪點並自動攻擊
+            EquipWeapon()
+            -- 懸停在怪物頭上 5 格處以確保安全
+            root.CFrame = CFrame.new(Config.MonsterPos + Vector3.new(0, 5, 0))
+            
+            -- 使用 VirtualUser 模擬點擊進行 CDK 砍殺
+            game:GetService("VirtualUser"):CaptureController()
+            game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
+        end
+    end
+end)
