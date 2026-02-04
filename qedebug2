@@ -1,0 +1,59 @@
+local HttpService = game:GetService("HttpService")
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+print("--- [1] 啟動深度調試版 ---")
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    if tostring(self) == "CommF_" and method == "InvokeServer" then
+        if args[1] == "GetQuests" or args[1] == "CheckQuest" then
+            print("--- [4] 攔截成功，準備呼叫伺服器獲取數據 ---")
+            
+            -- 嘗試直接獲取結果，不使用 task.spawn 以避免變數丟失
+            local success, result = pcall(function()
+                return oldNamecall(self, unpack(args))
+            end)
+
+            if not success then
+                warn("--- [5] ❌ 呼叫伺服器出錯: " .. tostring(result))
+                return oldNamecall(self, ...)
+            end
+
+            print("--- [5-A] 伺服器已回傳，類型為: " .. type(result))
+
+            if type(result) == "table" then
+                print("--- [5-B] 數據內容解析中... 項目數量: " .. #result)
+                
+                local list = "local QuestData = {\n"
+                local foundData = false
+                for i, q in pairs(result) do
+                    foundData = true
+                    list = list .. string.format('    ["%s"] = {LevelReq = %s},\n', tostring(q.Name or "Unknown"), tostring(q.LevelReq or 0))
+                end
+                list = list .. "}"
+
+                if foundData then
+                    print("--- [6] 格式化完成，準備發送 ---")
+                    -- 發送回 Discord (這裡可以用 task.spawn)
+                    task.spawn(function()
+                        local request = (syn and syn.request) or (http and http.request) or http_request or request
+                        request({
+                            Url = WebhookURL,
+                            Method = "POST",
+                            Headers = {["Content-Type"] = "application/json"},
+                            Body = HttpService:JSONEncode({content = "✅ 任務抓取成功：\n```lua\n" .. list .. "\n```"})
+                        })
+                    end)
+                else
+                    warn("--- [5-C] ❌ Table 內沒有找到任何任務項 (可能是空表)")
+                end
+            else
+                print("--- [5-D] ❌ 回傳值並非 Table，內容為: " .. tostring(result))
+            end
+        end
+    end
+    return oldNamecall(self, ...)
+end)
