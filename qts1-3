@@ -1,0 +1,88 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local player = game.Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+
+-- 【設定區】
+local TWEEN_SPEED = 300 
+local WEAPON_NAME = "Cursed Dual Katana" -- 你目前的頂級武器
+
+local QuestChain = {
+    {Name = "JungleQuest", ID = 1, Mob = "Monkey", Pos = CFrame.new(-1598, 36, 153)},
+    {Name = "SnowQuest", ID = 1, Mob = "Snow Bandit", Pos = CFrame.new(1386, 87, -1298)}
+}
+
+-- 1. 🔥 強化版自動普攻 (解決 Auto M1 不動的問題)
+local function UltimateClick()
+    -- 方法 A: 模擬鼠標點擊
+    vUser:CaptureController()
+    vUser:Button1Down(Vector2.new(1280, 672))
+    
+    -- 方法 B: 直接調用工具激活 (保險機制)
+    local tool = player.Character:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+-- 2. 裝備武器
+local function EquipWeapon()
+    local tool = player.Backpack:FindFirstChild(WEAPON_NAME)
+    if tool then
+        player.Character.Humanoid:EquipTool(tool)
+    end
+end
+
+-- 3. 防拉回移動
+local function SafeMove(targetCFrame)
+    local root = player.Character:WaitForChild("HumanoidRootPart")
+    local distance = (root.Position - targetCFrame.p).Magnitude
+    local tween = TweenService:Create(root, TweenInfo.new(distance/TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    local bv = Instance.new("BodyVelocity", root)
+    bv.Velocity = Vector3.new(0,0,0)
+    tween:Play()
+    tween.Completed:Wait()
+    bv:Destroy()
+end
+
+-- 4. 核心掛機循環
+task.spawn(function()
+    local currentIndex = 1
+    while true do
+        local q = QuestChain[currentIndex]
+        
+        -- A. 檢查任務
+        if not player.PlayerGui.Main.Quest.Visible then
+            SafeMove(q.Pos)
+            task.wait(0.5)
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", q.Name, q.ID)
+        end
+
+        -- B. 戰鬥循環 (不使用 Bring，改為貼身肉搏)
+        while player.PlayerGui.Main.Quest.Visible do
+            EquipWeapon()
+            
+            -- 尋找最近的目標怪物
+            local target = nil
+            for _, v in pairs(game.Workspace.Enemies:GetChildren()) do
+                if v.Name == q.Mob and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health > 0 then
+                    target = v
+                    break
+                end
+            end
+
+            if target then
+                -- 飛到怪物的正上方或側面 (避開碰撞)
+                player.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                UltimateClick() -- 執行強化普攻
+            else
+                -- 沒怪時回任務點上方等待
+                player.Character.HumanoidRootPart.CFrame = q.Pos * CFrame.new(0, 20, 0)
+            end
+            task.wait(0.1) -- 攻速設定
+        end
+        
+        currentIndex = (currentIndex % #QuestChain) + 1
+        task.wait(1)
+    end
+end)
