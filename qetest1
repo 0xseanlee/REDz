@@ -1,0 +1,38 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+print("--- 🕵️ 正在偵測當前任務的系統內部名稱 ---")
+
+local function DetectQuestInternalName()
+    local mainGui = player.PlayerGui:FindFirstChild("Main")
+    local questGui = mainGui and mainGui:FindFirstChild("Quest")
+    
+    if questGui and questGui.Visible then
+        local container = questGui:FindFirstChild("Container")
+        if container then
+            print("✅ 發現活動中任務 UI")
+            
+            -- 遍歷所有元件，抓取隱藏的系統字串
+            for _, obj in pairs(container:GetDescendants()) do
+                if obj:IsA("TextLabel") and obj.Text ~= "" then
+                    -- 排除掉 Reward 和錢字號，剩下的通常就是系統名稱
+                    if not obj.Text:find("%$") and not obj.Text:find("Exp") then
+                        print(string.format("📌 偵測到潛在名稱: [%s] (物件名: %s)", obj.Text, obj.Name))
+                    end
+                end
+            end
+            
+            -- 嘗試抓取任務進度中的怪物名稱
+            local stage = container:FindFirstChild("QuestStage") or container:FindFirstChild("Stage")
+            if stage and stage:IsA("TextLabel") then
+                print("👾 當前目標怪物: " .. stage.Text)
+            end
+        else
+            warn("❌ 找不到 Container 容器")
+        end
+    else
+        warn("⚠️ 你目前似乎沒有接取任何任務，或 UI 未開啟")
+    end
+end
+
+DetectQuestInternalName()
