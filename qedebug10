@@ -1,0 +1,72 @@
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- 【Webhook 設定】
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+-- 執行器相容 Request 函數
+local function UniversalRequest(payload)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        pcall(function()
+            req({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(payload)
+            })
+        end)
+    end
+end
+
+print("🚀 啟動全島嶼數據深層掃描...")
+
+-- 1. 抓取角色基本數值 (Stats)
+local stats = {}
+for _, stat in pairs(player.Data:GetChildren()) do
+    if stat:IsA("ValueBase") then
+        stats[stat.Name] = stat.Value
+    end
+end
+
+-- 2. 抓取背包道具 (Inventory)
+local inventory = {}
+for _, item in pairs(player.Backpack:GetChildren()) do
+    table.insert(inventory, item.Name)
+end
+for _, item in pairs(player.Character:GetChildren()) do
+    if item:IsA("Tool") then table.insert(inventory, item.Name .. " (裝備中)") end
+end
+
+-- 3. 抓取當前任務狀態 (Active Quest)
+local currentQuest = "無任務"
+local questProgress = ""
+local mainGui = player.PlayerGui:FindFirstChild("Main")
+if mainGui and mainGui:FindFirstChild("Quest") and mainGui.Quest.Visible then
+    currentQuest = mainGui.Quest.Container.QuestTitle.Text
+    questProgress = mainGui.Quest.Container.QuestStage.Text
+end
+
+-- 4. 抓取所有已學習的技能/覺醒狀態 (如適用)
+local masteryInfo = "Mastery: " .. tostring(player.Data.Level.Value) -- 簡化版
+
+-- 整合大數據表格
+local fullData = {
+    embeds = {{
+        title = "🔍 玩家全數據報告 - " .. player.Name,
+        color = 0x00FFFF,
+        fields = {
+            {name = "📈 基本屬性", value = string.format("等級: %s\n金錢: %s\n碎片: %s", stats["Level"] or "N/A", stats["Beli"] or "0", stats["Fragments"] or "0"), inline = true},
+            {name = "📜 當前任務", value = string.format("名稱: %s\n進度: %s", currentQuest, questProgress), inline = true},
+            {name = "🎒 背包內容", value = #inventory > 0 and table.concat(inventory, ", ") or "空", inline = false},
+            {name = "📍 當前座標", value = tostring(player.Character.HumanoidRootPart.Position), inline = false}
+        },
+        footer = {text = "數據採集時間: " .. os.date("%X")}
+    }}
+}
+
+-- 執行發送
+UniversalRequest(fullData)
+print("✅ 數據已完整外洩至 Discord (誤)")
