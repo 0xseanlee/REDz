@@ -1,0 +1,52 @@
+local HttpService = game:GetService("HttpService")
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+print("--- [穩定版] UI 任務數據監測器啟動 ---")
+
+-- 發送函數
+local function Send(msg)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        req({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({content = msg})
+        })
+    end
+end
+
+-- 監控 UI 變化
+local player = game.Players.LocalPlayer
+local lastData = ""
+
+task.spawn(function()
+    while task.wait(2) do -- 每 2 秒檢查一次你的螢幕
+        local mainGui = player.PlayerGui:FindFirstChild("Main")
+        local questGui = mainGui and mainGui:FindFirstChild("Quest")
+        
+        -- 如果對話框是開啟狀態
+        if questGui and questGui.Visible then
+            local container = questGui:FindFirstChild("Container")
+            if container then
+                local currentBatch = "📍 偵測到螢幕任務清單：\n"
+                local found = false
+                
+                -- 掃描對話框內的所有按鈕文字
+                for _, item in pairs(container:GetChildren()) do
+                    if item:IsA("TextButton") and item.Text ~= "" then
+                        currentBatch = currentBatch .. "- " .. item.Text .. "\n"
+                        found = true
+                    end
+                end
+                
+                -- 如果抓到了新數據，且跟上次不一樣，就發送
+                if found and currentBatch ~= lastData then
+                    lastData = currentBatch
+                    print("✅ 成功從 UI 抓取任務資訊")
+                    Send("```\n" .. currentBatch .. "\n```")
+                end
+            end
+        end
+    end
+end)
