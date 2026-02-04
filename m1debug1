@@ -1,0 +1,39 @@
+local player = game.Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+
+print("--- 🔍 開始診斷 CDK/GHC 普攻問題 ---")
+
+local function DiagnoseM1()
+    local char = player.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    
+    if not tool then
+        warn("❌ 錯誤：請先手動拿著 CDK 或 GHC 再執行測試！")
+        return
+    end
+    
+    print("📍 當前裝備: " .. tool.Name)
+
+    -- 【測試 1: 基礎協議觸發】
+    local p1 = pcall(function()
+        tool:Activate()
+    end)
+    print("1. Tool:Activate() 執行狀態: " .. (p1 and "✅ 送出" or "❌ 失敗"))
+
+    -- 【測試 2: 虛擬滑鼠點擊】
+    local p2 = pcall(function()
+        vUser:CaptureController()
+        vUser:ClickButton1(Vector2.new(640, 360))
+    end)
+    print("2. VirtualUser 點擊狀態: " .. (p2 and "✅ 送出" or "❌ 失敗"))
+
+    -- 【測試 3: 攻擊遠端協議 (Remotes)】
+    -- 這是 Blox Fruit 物理武器傷害的底層核心
+    local p3 = pcall(function()
+        local remote = game:GetService("ReplicatedStorage").Remotes.CommF_
+        remote:InvokeServer("Attack") -- 嘗試直接呼叫通用攻擊協議
+    end)
+    print("3. CommF Attack 協議狀態: " .. (p3 and "✅ 送出" or "❌ 失敗"))
+end
+
+DiagnoseM1()
