@@ -1,0 +1,76 @@
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 【核心設定】
+local TWEEN_SPEED = 300 -- 安全滑行速度
+local WEAPON_NAME = "Cursed Dual Katana" -- 使用你背包中的最強武器
+
+-- 【任務路徑清單】(包含 NPC 座標與怪物名稱)
+local QuestChain = {
+    {Name = "BanditQuest1", ID = 1, Mob = "Bandit", Pos = CFrame.new(1059, 16, 1549)},
+    {Name = "JungleQuest", ID = 1, Mob = "Monkey", Pos = CFrame.new(-1598, 36, 153)},
+    {Name = "JungleQuest", ID = 2, Mob = "Gorilla", Pos = CFrame.new(-1598, 36, 153)},
+    {Name = "SnowQuest", ID = 1, Mob = "Snow Bandit", Pos = CFrame.new(1386, 87, -1298)},
+    {Name = "SnowQuest", ID = 2, Mob = "Snowman", Pos = CFrame.new(1386, 87, -1298)}
+}
+
+local CurrentIndex = 1
+
+-- 1. 極速滑行函數 (解決拉回問題)
+local function SafeMove(targetCFrame)
+    local root = player.Character:WaitForChild("HumanoidRootPart")
+    local distance = (root.Position - targetCFrame.p).Magnitude
+    local tween = TweenService:Create(root, TweenInfo.new(distance/TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    
+    -- 飛行保護：防止掉落
+    local bv = Instance.new("BodyVelocity", root)
+    bv.Velocity = Vector3.new(0,0,0)
+    
+    tween:Play()
+    tween.Completed:Wait()
+    bv:Destroy()
+end
+
+-- 2. 戰鬥邏輯：自動砍殺
+local function AutoKill(mobName)
+    local weapon = player.Backpack:FindFirstChild(WEAPON_NAME) or player.Character:FindFirstChild(WEAPON_NAME)
+    if weapon then player.Character.Humanoid:EquipTool(weapon) end
+    
+    while player.PlayerGui.Main.Quest.Visible do
+        for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+            if enemy.Name == mobName and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                -- 飛到怪頭上 5 格
+                player.Character.HumanoidRootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                game:GetService("VirtualUser"):Button1Down(Vector2.new(0,0))
+                task.wait(0.1)
+            end
+        end
+        task.wait(0.5)
+    end
+end
+
+-- 3. 主循環：全域任務推進
+task.spawn(function()
+    print("🚀 啟動 BM_20SHOP7202 一海全域任務鏈...")
+    while CurrentIndex <= #QuestChain do
+        local q = QuestChain[CurrentIndex]
+        
+        -- A. 移動到 NPC 並接任務
+        SafeMove(q.Pos)
+        task.wait(0.5)
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("AbandonQuest")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", q.Name, q.ID)
+        
+        -- B. 開始打怪直到任務完成
+        if player.PlayerGui.Main.Quest.Visible then
+            print("⚔️ 正在執行: " .. q.Mob)
+            AutoKill(q.Mob)
+            print("✅ 完成: " .. q.Mob)
+            CurrentIndex = CurrentIndex + 1
+        end
+        task.wait(1)
+    end
+    print("🎉 一海所有測試任務已全數完成！")
+end)
