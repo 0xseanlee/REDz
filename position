@@ -1,0 +1,38 @@
+-- 基礎設定
+local UIS = game:GetService("UserInputService")
+local LogKey = Enum.KeyCode.P -- 設定按鍵為 P
+local Locations = {} -- 儲存座標的列表
+
+print("--- 座標記錄器已啟動 ---")
+print("按下 'P' 鍵來記錄當前位置")
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end -- 如果正在聊天則不觸發
+    
+    if input.KeyCode == LogKey then
+        local lp = game.Players.LocalPlayer
+        if lp and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+            local cf = lp.Character.HumanoidRootPart.CFrame
+            
+            -- 格式化座標，保留兩位小數方便閱讀
+            local x = string.format("%.2f", cf.X)
+            local y = string.format("%.2f", cf.Y)
+            local z = string.format("%.2f", cf.Z)
+            
+            -- 格式化成可以直接用的 CFrame.new 代碼
+            local entry = "CFrame.new(" .. x .. ", " .. y .. ", " .. z .. ")"
+            table.insert(Locations, entry)
+            
+            -- 在 F9 控制台輸出結果
+            print("--------------------------------")
+            print("已記錄第 " .. #Locations .. " 個座標：")
+            print(entry)
+            print("完整列表如下：")
+            print("local Locations = {")
+            for i, v in ipairs(Locations) do
+                print("    [" .. i .. "] = " .. v .. ",")
+            end
+            print("}")
+        end
+    end
+end)
