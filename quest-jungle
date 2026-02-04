@@ -1,0 +1,61 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local root = player.Character.HumanoidRootPart
+
+-- 【關鍵修正】雪地任務 NPC 的精確座標
+-- 必須站在這個位置，伺服器才會接受你的請求
+local QuestNPC_CFrame = CFrame.new(1386, 87, -1298) 
+
+local Config = {
+    QuestName = "JungleQuest",
+    QuestID = 1,
+    WaitTime = 0.5 -- 飛到後等待多久才接任務 (太快會失敗)
+}
+
+print("--- ❄️ [深度修正] 距離檢測突破版啟動 ---")
+
+local function ForceAcceptQuest()
+    -- 1. 為了確保成功，先瞬移到 NPC 面前
+    print("📍 正在移動到 NPC 旁以通過距離檢測...")
+    player.Character.HumanoidRootPart.CFrame = QuestNPC_CFrame
+    task.wait(Config.WaitTime) -- 等待伺服器確認位置
+
+    -- 2. 為了防止有隱形任務卡住，先發送一次「放棄任務」
+    ReplicatedStorage.Remotes.CommF_:InvokeServer("AbandonQuest")
+    
+    -- 3. 正式發送接任務請求
+    print("📨 發送接取請求...")
+    local response = ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", Config.QuestName, Config.QuestID)
+    -- 注意：有些版本使用 "StartQuest" 而非 "AcceptQuest"，這裡做了替換嘗試
+    
+    -- 如果 StartQuest 沒反應，嘗試舊版 AcceptQuest
+    if not response then
+        response = ReplicatedStorage.Remotes.CommF_:InvokeServer("AcceptQuest", Config.QuestName, Config.QuestID)
+    end
+
+    print("🔄 伺服器回應代碼: " .. tostring(response))
+    
+    return response
+end
+
+-- 監控循環
+task.spawn(function()
+    while true do
+        local questUI = player.PlayerGui.Main:FindFirstChild("Quest")
+        
+        -- 如果 UI 沒顯示，或者顯示了但不是 Snow Bandits，就強制重接
+        if not questUI or not questUI.Visible then
+            local result = ForceAcceptQuest()
+            if result then
+                print("✅ 任務接取成功！")
+                -- 成功後稍微往上飛，避免被怪圍毆
+                root.CFrame = root.CFrame + Vector3.new(0, 10, 0)
+                task.wait(2) -- 暫停一下確認狀態
+            end
+        else
+            -- 任務已存在，停止刷屏
+        end
+        task.wait(2)
+    end
+end)
