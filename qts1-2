@@ -1,0 +1,86 @@
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+
+-- 【核心戰鬥設定】
+local BRING_RANGE = 300 -- 聚怪半徑 (300格內的怪都會被吸過來)
+local TWEEN_SPEED = 300 
+local WEAPON_NAME = "Cursed Dual Katana" --
+
+-- 【任務清單】 (可持續擴充)
+local QuestChain = {
+    {Name = "JungleQuest", ID = 1, Mob = "Monkey", Pos = CFrame.new(-1598, 36, 153)},
+    {Name = "SnowQuest", ID = 1, Mob = "Snow Bandit", Pos = CFrame.new(1386, 87, -1298)}
+}
+
+-- 1. [Bring Mob] 核心聚怪函數
+-- 原理：將目標怪物的 CFrame 強制鎖定在玩家前方
+local function BringMob(mobName)
+    pcall(function()
+        for _, v in pairs(game.Workspace.Enemies:GetChildren()) do
+            if v.Name == mobName and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health > 0 then
+                if (v.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= BRING_RANGE then
+                    -- 將怪物的座標同步到玩家前方 5 格處
+                    v.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5)
+                    v.HumanoidRootPart.CanCollide = false -- 關閉碰撞防止推擠
+                    if v.Humanoid.Health <= 0 then v:Destroy() end
+                end
+            end
+        end
+    end)
+end
+
+-- 2. [Auto Click] 自動普攻函數
+local function AutoClick()
+    vUser:CaptureController()
+    vUser:Button1Down(Vector2.new(1280, 672))
+end
+
+-- 3. [Safe Move] 極速滑行 (防拉回)
+local function SafeMove(targetCFrame)
+    local root = player.Character:WaitForChild("HumanoidRootPart")
+    local distance = (root.Position - targetCFrame.p).Magnitude
+    local tween = TweenService:Create(root, TweenInfo.new(distance/TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    local bv = Instance.new("BodyVelocity", root)
+    bv.Velocity = Vector3.new(0,0,0)
+    tween:Play()
+    tween.Completed:Wait()
+    bv:Destroy()
+end
+
+-- 4. [Main Loop] 主循環
+task.spawn(function()
+    local currentIndex = 1
+    while true do
+        local q = QuestChain[currentIndex]
+        if not q then break end
+
+        -- 第一步：移動並接任務
+        if not player.PlayerGui.Main.Quest.Visible then
+            SafeMove(q.Pos)
+            task.wait(0.5)
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", q.Name, q.ID)
+        end
+
+        -- 第二步：戰鬥階段
+        while player.PlayerGui.Main.Quest.Visible do
+            -- 裝備 CDK
+            local tool = player.Backpack:FindFirstChild(WEAPON_NAME) or player.Character:FindFirstChild(WEAPON_NAME)
+            if tool then player.Character.Humanoid:EquipTool(tool) end
+
+            -- 執行聚怪與普攻
+            BringMob(q.Mob)
+            AutoClick()
+            
+            -- 為了安全，角色懸停在怪點上方
+            player.Character.HumanoidRootPart.CFrame = q.Pos * CFrame.new(0, 20, 0)
+            
+            task.wait(0.1) -- 攻擊頻率
+        end
+        
+        print("✅ 任務完成，切換下一島嶼")
+        currentIndex = (currentIndex % #QuestChain) + 1
+        task.wait(1)
+    end
+end)
