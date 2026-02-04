@@ -1,0 +1,63 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+
+-- 【已填入你的 Webhook】
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+print("--- 任務數據監聽器 (Webhook版) 已啟動 ---")
+print("請與 NPC 對話，數據將同步發送至 Discord。")
+
+-- 執行器專用發送函數
+local function SendToDiscord(taskList)
+    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
+    if request then
+        request({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({
+                embeds = {{
+                    title = "📜 偵測到新任務數據",
+                    description = "```lua\n" .. taskList .. "\n```",
+                    color = 0x5865F2, -- Discord 藍
+                    footer = { text = "來自數據採集工具" }
+                }}
+            })
+        })
+    end
+end
+
+-- 攔截 CommF_ 協議
+local oldInvokeServer
+oldInvokeServer = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    if tostring(self) == "CommF_" and method == "InvokeServer" then
+        -- 當觸發 "GetQuests" (獲取清單) 時
+        if args[1] == "GetQuests" or args[1] == "CheckQuest" then
+            task.spawn(function()
+                local result = self:InvokeServer(unpack(args))
+                if result and type(result) == "table" then
+                    local taskList = "local QuestData = {\n"
+                    for _, quest in pairs(result) do
+                        taskList = taskList .. string.format(
+                            '    ["%s"] = {LevelReq = %s, Reward = %s},\n',
+                            tostring(quest.Name), 
+                            tostring(quest.LevelReq or "0"), 
+                            tostring(quest.RewardMoney or "0")
+                        )
+                    end
+                    taskList = taskList .. "}"
+                    
+                    -- 輸出到控制台與 Discord
+                    print(taskList)
+                    SendToDiscord(taskList)
+                    print("🚀 數據已發送到 Discord")
+                end
+            end)
+        end
+    end
+    return oldInvokeServer(self, ...)
+end)
