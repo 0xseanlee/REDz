@@ -1,0 +1,130 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local player = Players.LocalPlayer
+local root = player.Character.HumanoidRootPart
+
+-- 【任務清單：我們手動安排的順序】
+-- 格式：{任務組名, 任務ID, 怪物名稱, NPC座標}
+local QuestSequence = {
+    [1] = {
+        Name = "BanditQuest1", 
+        ID = 1, 
+        Mob = "Bandit", 
+        NPC_Pos = CFrame.new(1059, 16, 1549) -- 起始島盜賊 NPC
+    },
+    [2] = {
+        Name = "JungleQuest", 
+        ID = 1, 
+        Mob = "Monkey", 
+        NPC_Pos = CFrame.new(-1598, 36, 153) -- 叢林冒險家 NPC
+    },
+    [3] = {
+        Name = "JungleQuest", 
+        ID = 2, 
+        Mob = "Gorilla", 
+        NPC_Pos = CFrame.new(-1598, 36, 153) -- 叢林冒險家 NPC (同一個)
+    },
+    [4] = {
+        Name = "SnowQuest", 
+        ID = 1, 
+        Mob = "Snow Bandit", 
+        NPC_Pos = CFrame.new(1386, 87, -1298) -- 雪島 NPC
+    }
+}
+
+-- 【狀態變數】
+local CurrentStep = 1 -- 從第 1 步開始
+local IsQuestTaken = false
+
+print("--- 🎬 一海流程測試器啟動 (忽略等級模式) ---")
+
+-- 1. 基礎工具：裝備武器
+local function EquipCDK()
+    local tool = player.Backpack:FindFirstChild("Cursed Dual Katana") or player.Backpack:FindFirstChild("Godhuman")
+    if tool then player.Character.Humanoid:EquipTool(tool) end
+end
+
+-- 2. 基礎工具：檢查任務欄
+local function HasQuest()
+    local gui = player.PlayerGui.Main:FindFirstChild("Quest")
+    return gui and gui.Visible
+end
+
+-- 3. 核心：移動與接任務
+local function ProcessStep()
+    local taskData = QuestSequence[CurrentStep]
+    
+    if not taskData then
+        print("🎉 測試清單上的所有任務已完成！")
+        return
+    end
+
+    if not HasQuest() then
+        -- 【階段 A：去接任務】
+        print(string.format("📍 [步驟 %d] 前往接取: %s (%s)", CurrentStep, taskData.Name, taskData.Mob))
+        
+        -- 1. 瞬移到 NPC
+        root.CFrame = taskData.NPC_Pos
+        task.wait(0.5) -- 等待距離判定
+        
+        -- 2. 發送請求
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("AbandonQuest") -- 先放棄舊的防止卡住
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", taskData.Name, taskData.ID)
+        
+        task.wait(1)
+        if HasQuest() then
+            print("✅ 任務接取成功！準備戰鬥")
+            IsQuestTaken = true
+        end
+    else
+        -- 【階段 B：去打怪】
+        if not IsQuestTaken then IsQuestTaken = true end -- 確保狀態同步
+        
+        -- 1. 搜尋地圖上的怪物
+        local target = nil
+        for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+            if enemy.Name == taskData.Mob and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                target = enemy
+                break
+            end
+        end
+        
+        if target then
+            -- 2. 瞬移到怪物頭上 (Y + 5)
+            EquipCDK()
+            root.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+            
+            -- 3. 自動攻擊
+            VirtualUser:CaptureController()
+            VirtualUser:Button1Down(Vector2.new(1280, 672))
+            
+            print("⚔️ 正在攻擊: " .. taskData.Mob)
+        else
+            -- 沒怪的時候，懸停在怪區上方等待刷新
+            -- 這裡簡單處理：如果找不到怪，就停在 NPC 附近上方等待
+            root.CFrame = taskData.NPC_Pos * CFrame.new(0, 30, 0)
+            print("⏳ 等待怪物刷新中...")
+        end
+    end
+end
+
+-- 4. 監控與進度切換
+task.spawn(function()
+    while true do
+        local success, err = pcall(function()
+            -- 判定任務完成：原本有接任務(IsQuestTaken=true)，現在沒任務了(HasQuest=false)
+            if IsQuestTaken and not HasQuest() then
+                print("✨ 步驟 " .. CurrentStep .. " 完成！晉級下一步...")
+                CurrentStep = CurrentStep + 1
+                IsQuestTaken = false
+                task.wait(2) -- 休息一下
+            else
+                ProcessStep()
+            end
+        end)
+        
+        if not success then warn("腳本錯誤: " .. err) end
+        task.wait(0.2)
+    end
+end)
