@@ -1,0 +1,44 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 【設定區】
+local QuestName = "Monkeys" -- 你抓到的任務名稱
+local QuestID = 1           -- 通常第一個選項是 1
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+-- 1. 執行器專用 Request 函數 (自動偵測，避免 Line 2 nil 報錯)
+local function SafeRequest(msg)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        pcall(function()
+            req({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = game:GetService("HttpService"):JSONEncode({content = msg})
+            })
+        end)
+    end
+end
+
+-- 2. 自動接任務函數
+local function AcceptMonkeysQuest()
+    print("--- 正在嘗試遠端接取: " .. QuestName .. " ---")
+    
+    -- 尋找遊戲通訊管道
+    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+    
+    -- 直接對伺服器發送「我要接任務」的請求
+    local result = remote:InvokeServer("AcceptQuest", QuestName, QuestID)
+    
+    if result == 1 or result == true then
+        print("✅ 成功領取 Monkeys 任務！")
+        SafeRequest("🎮 已成功自動接取任務: **Monkeys**")
+    else
+        warn("❌ 無法領取任務 (可能你已經有任務，或是等級超過太多)")
+    end
+end
+
+-- 執行動作
+AcceptMonkeysQuest()
