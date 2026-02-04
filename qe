@@ -1,0 +1,49 @@
+local HttpService = game:GetService("HttpService")
+
+-- 【更換為代理網址，防止 Discord 封鎖】
+local RawURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+local WebhookURL = RawURL:gsub("discord.com", "hooks.hyra.io") 
+
+-- 測試發送函數
+local function TestSend(msg)
+    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
+    if request then
+        local response = request({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({content = msg})
+        })
+        print("Webhook 測試結果: " .. tostring(response.StatusCode))
+    else
+        warn("你的執行器不支援 Http Request")
+    end
+end
+
+-- 腳本啟動時先發一個測試，看 Discord 有沒有反應
+TestSend("🚀 任務數據採集器已連線！")
+
+-- 監聽任務數據
+local oldInvokeServer
+oldInvokeServer = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    if tostring(self) == "CommF_" and method == "InvokeServer" then
+        if args[1] == "GetQuests" or args[1] == "CheckQuest" then
+            task.spawn(function()
+                local result = self:InvokeServer(unpack(args))
+                if result and type(result) == "table" then
+                    local taskList = "local QuestData = {\n"
+                    for _, quest in pairs(result) do
+                        taskList = taskList .. string.format('    ["%s"] = {LevelReq = %s},\n', tostring(quest.Name), tostring(quest.LevelReq or "0"))
+                    end
+                    taskList = taskList .. "}"
+                    
+                    TestSend("📜 偵測到任務：\n" .. taskList)
+                end
+            end)
+        end
+    end
+    return oldInvokeServer(self, ...)
+end)
