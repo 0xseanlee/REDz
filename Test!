@@ -1,0 +1,24 @@
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- 你提供的清單
+local Locations = {
+    ["Jungle Quests"] = CFrame.new(-1596.43, 37.19, 154.34),
+    ["Blox Fruit Gacha"] = CFrame.new(-1438.35, 62.19, 4.75),
+}
+
+-- 瞬移函數
+local function teleportTo(locationName)
+    local targetCFrame = Locations[locationName]
+    if targetCFrame then
+        rootPart.CFrame = targetCFrame
+        print("已到達: " .. locationName)
+    else
+        warn("找不到名為 " .. locationName .. " 的座標")
+    end
+end
+
+-- 測試：5秒後瞬移到扭蛋機
+task.wait(5)
+teleportTo("Blox Fruit Gacha")
