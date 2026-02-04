@@ -1,0 +1,31 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- 根據你的數據報告：Jungle 任務點座標
+local NPC_CFrame = CFrame.new(-1595.45, 37.19, 148.04)
+
+print("--- 🚀 [自動化] 正在嘗試接取一海猴子任務 ---")
+
+local function AcceptMonkeyQuest()
+    local success, err = pcall(function()
+        -- 1. 檢查是否已經有任務 (避免重複接取)
+        local questUI = player.PlayerGui.Main:FindFirstChild("Quest")
+        if questUI and not questUI.Visible then
+            print("📍 正在發送遠端請求: JungleQuest - Monkeys")
+            
+            -- 使用 CommF_ 協議
+            -- 參數 "AcceptQuest", "JungleQuest", 1 分別代表：動作、任務組、序號(Monkey)
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("AcceptQuest", "JungleQuest", 1)
+        end
+    end)
+    
+    if not success then warn("⚠️ 接任務請求失敗: " .. tostring(err)) end
+end
+
+-- 啟動循環檢查
+task.spawn(function()
+    while true do
+        AcceptMonkeyQuest()
+        task.wait(3) -- 每 3 秒確認一次
+    end
+end)
