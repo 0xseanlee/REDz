@@ -1,0 +1,83 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local player = Players.LocalPlayer
+local root = player.Character.HumanoidRootPart
+
+-- 【設定區】
+local Config = {
+    QuestName = "Monkeys",
+    MonsterPos = Vector3.new(-1595, 45, 148), -- 根據你回傳的座標微調高度
+    WeaponName = "Cursed Dual Katana"        -- 你背包裡的武器
+}
+
+-- 1. 自動裝備武器
+local function EquipWeapon()
+    local tool = player.Backpack:FindFirstChild(Config.WeaponName)
+    if tool then
+        player.Character.Humanoid:EquipTool(tool)
+    end
+end
+
+-- 2. 核心掛機邏輯
+task.spawn(function()
+    print("--- ⚔️ 自動刷怪系統啟動 ---")
+    while task.wait(0.1) do
+        -- 檢查有沒有任務，沒有就接
+        local questUI = player.PlayerGui.Main.Quest
+        if not questUI.Visible then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("AcceptQuest", Config.QuestName, 1)
+        else
+            -- 裝備 CDK
+            EquipWeapon()
+            
+            -- 飛到怪物正上方 (保留 5 格距離安全刷怪)
+            root.CFrame = CFrame.new(Config.MonsterPos + Vector3.new(0, 5, 0))
+            
+            -- 自動點擊攻擊
+            VirtualUser:CaptureController()
+            VirtualUser:Button1Down(Vector2.new(1280, 672))
+        end
+    end
+end)local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local player = Players.LocalPlayer
+local root = player.Character.HumanoidRootPart
+
+-- 【設定區】
+local Config = {
+    QuestName = "Monkeys",
+    MonsterPos = Vector3.new(-1595, 45, 148), -- 根據你回傳的座標微調高度
+    WeaponName = "Cursed Dual Katana"        -- 你背包裡的武器
+}
+
+-- 1. 自動裝備武器
+local function EquipWeapon()
+    local tool = player.Backpack:FindFirstChild(Config.WeaponName)
+    if tool then
+        player.Character.Humanoid:EquipTool(tool)
+    end
+end
+
+-- 2. 核心掛機邏輯
+task.spawn(function()
+    print("--- ⚔️ 自動刷怪系統啟動 ---")
+    while task.wait(0.1) do
+        -- 檢查有沒有任務，沒有就接
+        local questUI = player.PlayerGui.Main.Quest
+        if not questUI.Visible then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("AcceptQuest", Config.QuestName, 1)
+        else
+            -- 裝備 CDK
+            EquipWeapon()
+            
+            -- 飛到怪物正上方 (保留 5 格距離安全刷怪)
+            root.CFrame = CFrame.new(Config.MonsterPos + Vector3.new(0, 5, 0))
+            
+            -- 自動點擊攻擊
+            VirtualUser:CaptureController()
+            VirtualUser:Button1Down(Vector2.new(1280, 672))
+        end
+    end
+end)
