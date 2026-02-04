@@ -1,0 +1,62 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- --- UI 建立 ---
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+screenGui.ResetOnSpawn = false
+local btn = Instance.new("TextButton", screenGui)
+btn.Size = UDim2.new(0, 160, 0, 50)
+btn.Position = UDim2.new(0, 50, 0.4, 0)
+btn.Text = "FORCE CDK M1: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Instance.new("UICorner", btn)
+
+getgenv().ForceM1 = false
+
+btn.MouseButton1Click:Connect(function()
+    getgenv().ForceM1 = not getgenv().ForceM1
+    btn.Text = getgenv().ForceM1 and "FORCE CDK M1: ON" or "FORCE CDK M1: OFF"
+    btn.BackgroundColor3 = getgenv().ForceM1 and Color3.fromRGB(150, 0, 255) or Color3.fromRGB(30, 30, 30)
+end)
+
+-- --- 認真的 CDK 傷害輸出邏輯 ---
+task.spawn(function()
+    while true do
+        if getgenv().ForceM1 then
+            pcall(function()
+                local char = player.Character
+                local tool = char:FindFirstChildOfClass("Tool")
+                
+                -- 只有在拿著 CDK、GHC 或閃果劍時執行
+                if tool and (tool.Name:find("Katana") or tool.Name:find("Human") or tool.Name:find("Light")) then
+                    
+                    -- 1. 強制播放攻擊動畫 (繞過點擊，直接讓伺服器看到你在揮刀)
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local anims = {8043499393, 8043510625, 1244440781} -- CDK/GHC 常用攻擊動畫 ID
+                    local anim = Instance.new("Animation")
+                    anim.AnimationId = "rbxassetid://" .. anims[math.random(1, #anims)]
+                    local load = hum:LoadAnimation(anim)
+                    load:Play()
+
+                    -- 2. 配合遠端攻擊確認
+                    -- 這是根據你之前診斷 OK 但沒傷害的結果進行的修正
+                    local remote = ReplicatedStorage.Remotes.CommF_
+                    remote:InvokeServer("Attack") 
+                    
+                    -- 3. 針對目標怪物直接施加傷害判定
+                    for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+                        if enemy:FindFirstChild("HumanoidRootPart") and enemy.Humanoid.Health > 0 then
+                            local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                            if dist < 50 then
+                                -- 關鍵：發送帶有位置驗證的傷害請求
+                                remote:InvokeServer("SwordHit", enemy.HumanoidRootPart.CFrame, {[1] = enemy})
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.2) -- 配合 CDK 的真實揮刀頻率
+    end
+end)
