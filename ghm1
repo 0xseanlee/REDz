@@ -1,0 +1,58 @@
+local player = game.Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+
+-- --- UI 建立 ---
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "WeaponM1_Fix"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 150, 0, 50)
+btn.Position = UDim2.new(0, 50, 0.4, 0)
+btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+btn.Text = "Weapon M1: OFF"
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 18
+btn.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.Parent = btn
+
+-- --- 核心邏輯 ---
+getgenv().WeaponM1_Enabled = false
+
+btn.MouseButton1Click:Connect(function()
+    getgenv().WeaponM1_Enabled = not getgenv().WeaponM1_Enabled
+    btn.Text = getgenv().WeaponM1_Enabled and "Weapon M1: ON" or "Weapon M1: OFF"
+    btn.BackgroundColor3 = getgenv().WeaponM1_Enabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(80, 80, 80)
+end)
+
+task.spawn(function()
+    while true do
+        if getgenv().WeaponM1_Enabled then
+            pcall(function()
+                local char = player.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                
+                if tool then
+                    -- 針對物理武器 (CDK/GHC) 的三重模擬法
+                    vUser:CaptureController()
+                    
+                    -- 1. 模擬按下 (必備)
+                    vUser:Button1Down(Vector2.new(640, 360))
+                    
+                    -- 2. 直接激活工具
+                    tool:Activate()
+                    
+                    -- 3. 稍微等待後模擬放開 (這是 CDK 判定的關鍵)
+                    task.wait(0.05) 
+                    vUser:Button1Up(Vector2.new(640, 360))
+                end
+            end)
+        end
+        -- 慢慢的節奏，確保 CDK 的動作幀能跑完
+        task.wait(0.2) 
+    end
+end)
