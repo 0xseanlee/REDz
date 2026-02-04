@@ -1,0 +1,49 @@
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- 【參數設定】
+local SPEED = 360 -- 滑行速度，300-350 是相對安全的極限
+local NPC_POS = CFrame.new(1386, 87, -1298) -- 雪地島 NPC 座標
+
+print("--- ✈️ [防拉回系統] 啟動極速滑行測試 ---")
+
+-- 核心函數：平滑移動到目的地
+local function SmoothMove(targetCFrame)
+    local root = player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local distance = (root.Position - targetCFrame.p).Magnitude
+    local duration = distance / SPEED
+    
+    local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(root, info, {CFrame = targetCFrame})
+    
+    -- 滑行期間關閉重力，防止掉下去
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = root
+    
+    tween:Play()
+    tween.Completed:Wait() -- 等待到達
+    
+    bv:Destroy()
+end
+
+-- 測試：飛過去接任務
+task.spawn(function()
+    print("📍 正在滑行至 NPC...")
+    SmoothMove(NPC_POS)
+    
+    task.wait(0.5) -- 到達後稍微停頓，讓伺服器同步位置
+    
+    print("📨 發送 SnowQuest 請求...")
+    local success = ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", "SnowQuest", 1)
+    
+    if success then
+        print("✅ 任務領取成功，且未觸發拉回！")
+    else
+        -- 如果 StartQuest 不行，試試 AcceptQuest
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("AcceptQuest", "SnowQuest", 1)
+    end
+end)
