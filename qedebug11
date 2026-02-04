@@ -1,0 +1,72 @@
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local player = Players.LocalPlayer
+
+-- 【Webhook 設定】
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+print("🚀 [Mac版] 啟動全方位數據掃描...")
+
+local function UniversalRequest(payload)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        pcall(function()
+            req({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(payload)
+            })
+        end)
+    end
+end
+
+-- 1. 深層掃描所有 Data 數值 (等級、金錢、屬性點等)
+local statsInfo = ""
+if player:FindFirstChild("Data") then
+    for _, v in pairs(player.Data:GetChildren()) do
+        if v:IsA("ValueBase") then
+            statsInfo = statsInfo .. string.format("• **%s**: %s\n", v.Name, tostring(v.Value))
+        end
+    end
+end
+
+-- 2. 掃描背包 (Inventory)
+local invList = {}
+for _, item in pairs(player.Backpack:GetChildren()) do
+    table.insert(invList, item.Name)
+end
+
+-- 3. 修正報錯的任務抓取邏輯 (遍歷搜尋 Text)
+local currentQuest = "無任務"
+pcall(function()
+    local qContainer = player.PlayerGui.Main.Quest.Container
+    -- 這裡改用遞迴尋找任何包含任務名稱的 TextLabel
+    for _, obj in pairs(qContainer:GetDescendants()) do
+        if (obj:IsA("TextLabel") or obj:IsA("TextBox")) and obj.Text ~= "" then
+            if obj.Name:find("Title") or obj.Name:find("Name") then
+                currentQuest = obj.Text
+                break
+            end
+        end
+    end
+end)
+
+-- 4. 格式化嵌入訊息
+local report = {
+    embeds = {{
+        title = "📊 終極數據報告: " .. player.Name,
+        color = 0x5865F2,
+        fields = {
+            {name = "🛠️ 系統屬性", value = statsInfo ~= "" and statsInfo or "未找到數據", inline = false},
+            {name = "🎒 背包摘要", value = #invList > 0 and table.concat(invList, ", ") or "空空如也", inline = false},
+            {name = "⚔️ 當前任務狀態", value = currentQuest, inline = true},
+            {name = "🌐 當前位置", value = tostring(player.Character.HumanoidRootPart.Position), inline = true}
+        },
+        footer = {text = "掃描器版本: Mac_Stable_V2 | 伺服器時間: " .. os.date("%X")}
+    }}
+}
+
+-- 執行
+UniversalRequest(report)
+print("✅ 掃描完成，數據已發送。")
