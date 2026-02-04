@@ -1,0 +1,51 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- --- UI 建立 ---
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+screenGui.ResetOnSpawn = false
+local btn = Instance.new("TextButton", screenGui)
+btn.Size = UDim2.new(0, 160, 0, 50)
+btn.Position = UDim2.new(0, 50, 0.4, 0)
+btn.Text = "CDK DAMAGE: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Instance.new("UICorner", btn)
+
+getgenv().CDK_Damage_Active = false
+
+btn.MouseButton1Click:Connect(function()
+    getgenv().CDK_Damage_Active = not getgenv().CDK_Damage_Active
+    btn.Text = getgenv().CDK_Damage_Active and "CDK DAMAGE: ON" or "CDK DAMAGE: OFF"
+    btn.BackgroundColor3 = getgenv().CDK_Damage_Active and Color3.fromRGB(200, 100, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+-- --- 核心：直接發送攻擊協議 ---
+task.spawn(function()
+    while true do
+        if getgenv().CDK_Damage_Active then
+            pcall(function()
+                local char = player.Character
+                local cdk = char:FindFirstChild("Cursed Dual Katana")
+                
+                if cdk then
+                    -- 1. 取得附近怪物 (30格內)
+                    for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+                        if enemy:FindFirstChild("HumanoidRootPart") and enemy.Humanoid.Health > 0 then
+                            local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                            if dist < 40 then
+                                -- 2. 直接發送「攻擊成功」協議
+                                -- 這是 Blox Fruit 傷害判定的底層呼叫，跳過揮刀動作
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack", {
+                                    [1] = enemy.HumanoidRootPart, -- 目標怪物
+                                    [2] = 1 -- 攻擊類型 (1 為普通 M1)
+                                })
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        -- 高頻發送以確保傷害輸出
+        task.wait(0.1) 
+    end
+end)
