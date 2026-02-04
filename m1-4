@@ -1,0 +1,97 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local vUser = game:GetService("VirtualUser")
+local camera = workspace.CurrentCamera
+
+-- --- UI 建立 (規範化寫法) ---
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CDK_Pro_V3"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 180, 0, 50)
+btn.Position = UDim2.new(0, 40, 0.4, 0)
+btn.Text = "ULTIMATE M1: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Parent = screenGui
+Instance.new("UICorner").Parent = btn
+
+_G.ProM1_Enabled = false
+
+btn.MouseButton1Click:Connect(function()
+    _G.ProM1_Enabled = not _G.ProM1_Enabled
+    btn.Text = _G.ProM1_Enabled and "ULTIMATE M1: ON" or "ULTIMATE M1: OFF"
+    btn.BackgroundColor3 = _G.ProM1_Enabled and Color3.fromRGB(0, 150, 200) or Color3.fromRGB(30, 30, 30)
+end)
+
+-- --- 核心功能函數 ---
+local function getNearestEnemy(maxDist)
+    local nearest = nil
+    local minDist = maxDist
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+
+    for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+        local root = enemy:FindFirstChild("HumanoidRootPart")
+        local hum = enemy:FindFirstChild("Humanoid")
+        if root and hum and hum.Health > 0 then
+            local dist = (char.HumanoidRootPart.Position - root.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = enemy
+            end
+        end
+    end
+    return nearest
+end
+
+task.spawn(function()
+    while true do
+        if _G.ProM1_Enabled then
+            pcall(function()
+                local char = player.Character
+                if not char or not char:FindFirstChild("Humanoid") then return end
+                
+                -- 1. 取得動態螢幕中心點 (適應不同解析度)
+                local screenSize = camera.ViewportSize
+                local center = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
+                
+                -- 2. 智能裝備邏輯
+                local toolName = "Cursed Dual Katana" -- 或 "Godhuman"
+                local tool = char:FindFirstChild(toolName) or player.Backpack:FindFirstChild(toolName)
+                
+                if tool then
+                    if tool.Parent == player.Backpack then
+                        char.Humanoid:EquipTool(tool)
+                        char:WaitForChild(toolName, 0.5) -- 驗證裝備成功
+                        task.wait(0.2) -- 等待裝備動畫播完
+                    end
+
+                    -- 3. 目標鎖定：面向最近的怪物
+                    local target = getNearestEnemy(40)
+                    if target then
+                        char.HumanoidRootPart.CFrame = CFrame.lookAt(
+                            char.HumanoidRootPart.Position,
+                            Vector3.new(target.HumanoidRootPart.Position.X, char.HumanoidRootPart.Position.Y, target.HumanoidRootPart.Position.Z)
+                        )
+                    end
+
+                    -- 4. 模擬真實點擊循環
+                    vUser:CaptureController()
+                    vUser:Button1Down(center)
+                    task.wait(0.05) -- 模擬按下時長
+                    vUser:Button1Up(center)
+                    
+                    -- 5. 隨機防掛機移動 (15% 機率移動鼠標)
+                    if math.random() < 0.15 then
+                        vUser:SetMousePos(math.random(100, screenSize.X-100), math.random(100, screenSize.Y-100))
+                    end
+                end
+            end)
+        end
+        -- 6. 隨機化攻擊間隔 (0.4s - 0.7s)，符合 CDK 物理攻速
+        task.wait(math.random(40, 70) / 100)
+    end
+end)
