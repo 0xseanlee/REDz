@@ -1,0 +1,51 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- 【任務數據庫】請根據你採集到的名稱填寫
+local QuestDatabase = {
+    [2500] = {Name = "EliteHunter", ID = 1, NPC_Pos = CFrame.new(-1596, 37, 154)}, -- 範例
+    [2660] = {Name = "FinalQuest", ID = 1, NPC_Pos = CFrame.new(-1438, 62, 4)}    -- 範例
+}
+
+print("--- [自動化中心] 啟動中 ---")
+
+-- 1. 檢查目前是否有任務
+local function IsTaskActive()
+    local mainGui = player.PlayerGui:FindFirstChild("Main")
+    return mainGui and mainGui:FindFirstChild("Quest") and mainGui.Quest.Visible
+end
+
+-- 2. 獲取適合目前等級的任務資訊
+local function GetMyQuestData()
+    local myLevel = player.Data.Level.Value
+    local bestLevel = 0
+    local selected = nil
+    
+    for level, data in pairs(QuestDatabase) do
+        if myLevel >= level and level >= bestLevel then
+            bestLevel = level
+            selected = data
+        end
+    end
+    return selected
+end
+
+-- 3. 主循環：自動接任務
+task.spawn(function()
+    while task.wait(5) do
+        if not IsTaskActive() then
+            local data = GetMyQuestData()
+            if data then
+                print("🔍 發現適合任務: " .. data.Name)
+                
+                -- 遠程接取任務協議
+                local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+                remote:InvokeServer("AcceptQuest", data.Name, data.ID)
+                
+                print("✅ 已嘗試自動接取任務")
+            end
+        else
+            print("⏳ 目前任務執行中...")
+        end
+    end
+end)
