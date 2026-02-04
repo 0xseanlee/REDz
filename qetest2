@@ -1,0 +1,40 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game.Players.LocalPlayer
+
+-- 【根據偵測結果更新：雪地島任務】
+local QuestConfig = {
+    QuestName = "SnowQuest", -- 雪地島系統名稱
+    QuestID = 1,             -- 1 代表 Snow Bandits
+    CheckDelay = 5
+}
+
+print("--- ❄️ [自動化] 正在針對 BM_20SHOP7202 啟動雪地任務接取 ---")
+
+local function IsQuestActive()
+    local mainGui = player.PlayerGui:FindFirstChild("Main")
+    local questGui = mainGui and mainGui:FindFirstChild("Quest")
+    -- 只要 UI 可見就代表任務進行中
+    return questGui and questGui.Visible
+end
+
+task.spawn(function()
+    while true do
+        local success, err = pcall(function()
+            if not IsQuestActive() then
+                print("📍 偵測到無任務，正在接取: Snow Bandits")
+                
+                -- 呼叫一海標準 CommF_ 協議
+                local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+                remote:InvokeServer("AcceptQuest", QuestConfig.QuestName, QuestConfig.QuestID)
+                
+                print("✅ 已成功發送 SnowQuest 接取請求")
+            end
+        end)
+        
+        if not success then
+            warn("⚠️ 接任務失敗: " .. tostring(err))
+        end
+        
+        task.wait(QuestConfig.CheckDelay)
+    end
+end)
