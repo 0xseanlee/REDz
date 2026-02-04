@@ -1,0 +1,12 @@
+-- 測試腳本：驗證 GitHub 讀取與執行權限
+print("--- REDz 測試啟動 ---")
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+if character and character:FindFirstChild("HumanoidRootPart") then
+    -- 讓角色坐標向前移動 5 格
+    character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5)
+    print("成功！角色已向前移動。")
+else
+    warn("找不到角色模型，請確保你已進入遊戲世界。")
+end
