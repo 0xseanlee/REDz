@@ -1,0 +1,108 @@
+--[[
+    ForceM1 Debug Edition
+    目標：
+    1. 移除「假攻擊」邏輯
+    2. 明確顯示哪一步在跑、哪一步被 Server 無視
+    3. 保留 UI 與合法的 Client 行為
+    ⚠ 不嘗試偽造傷害、不嘗試指定命中目標
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- ===== UI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ForceM1Gui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 160, 0, 50)
+btn.Position = UDim2.new(0, 50, 0.4, 0)
+btn.Text = "FORCE M1: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btn.Parent = screenGui
+Instance.new("UICorner", btn)
+
+getgenv().ForceM1 = false
+
+btn.MouseButton1Click:Connect(function()
+    getgenv().ForceM1 = not getgenv().ForceM1
+    btn.Text = getgenv().ForceM1 and "FORCE M1: ON" or "FORCE M1: OFF"
+    btn.BackgroundColor3 = getgenv().ForceM1 and Color3.fromRGB(150, 0, 255) or Color3.fromRGB(30, 30, 30)
+end)
+
+-- ===== Helpers =====
+local function getCharacter()
+    local char = player.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+
+    if not hum or not hrp then return end
+    return char, hum, hrp
+end
+
+local function getWeapon(char)
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+
+    if tool.Name:find("Katana") or tool.Name:find("Human") or tool.Name:find("Light") then
+        return tool
+    end
+end
+
+local function getCommF()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then return end
+
+    return remotes:FindFirstChild("CommF_")
+end
+
+-- ===== Main Loop =====
+task.spawn(function()
+    while task.wait(0.25) do
+        if not getgenv().ForceM1 then continue end
+
+        local char, hum, hrp = getCharacter()
+        if not char then
+            warn("[ForceM1] Character not ready")
+            continue
+        end
+
+        local tool = getWeapon(char)
+        if not tool then
+            warn("[ForceM1] No valid weapon equipped")
+            continue
+        end
+
+        -- 僅播放本地動畫（DEBUG 用）
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if animator then
+            local anim = Instance.new("Animation")
+            anim.AnimationId = "rbxassetid://8043499393"
+            local track = animator:LoadAnimation(anim)
+            track:Play()
+            print("[ForceM1] Played local animation")
+        end
+
+        -- 嘗試呼叫 Remote，觀察回傳值
+        local commF = getCommF()
+        if not commF then
+            warn("[ForceM1] CommF_ not found")
+            continue
+        end
+
+        local ok, result = pcall(function()
+            return commF:InvokeServer("Attack")
+        end)
+
+        if ok then
+            print("[ForceM1] Attack Invoke returned:", result)
+        else
+            warn("[ForceM1] Attack Invoke failed:", result)
+        end
+    end
+end)
