@@ -1,0 +1,57 @@
+local HttpService = game:GetService("HttpService")
+local WebhookURL = "https://discord.com/api/webhooks/1468528458056339529/WKTq9fLdmYaWVaM4b-yy78n9cEP5qB2NQx254k1pMLqJusi6HFefvtBL3vOaKznHoiFH"
+
+print("--- [1] 啟動被動監聽版 (防止卡死) ---")
+
+local function SendData(list)
+    print("--- [6] 準備發送至 Discord ---")
+    local request = (syn and syn.request) or (http and http.request) or http_request or request
+    if request then
+        request({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({content = "✅ 任務抓取成功：\n```lua\n" .. list .. "\n```"})
+        })
+    end
+end
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- 正常執行原有的遊戲邏輯，我們只在旁邊「偷看」回傳結果
+    local result = oldNamecall(self, ...)
+
+    if tostring(self) == "CommF_" and method == "InvokeServer" then
+        if args[1] == "GetQuests" or args[1] == "CheckQuest" then
+            print("--- [4] 偵測到任務請求回傳 ---")
+            
+            -- 檢查回傳結果
+            if result and type(result) == "table" then
+                print("--- [5] 成功在回傳值中找到 Table！ ---")
+                
+                local list = "local QuestData = {\n"
+                local found = false
+                for _, q in pairs(result) do
+                    if type(q) == "table" and q.Name then
+                        found = true
+                        list = list .. string.format('    ["%s"] = {LevelReq = %s},\n', tostring(q.Name), tostring(q.LevelReq or 0))
+                    end
+                end
+                list = list .. "}"
+
+                if found then
+                    task.spawn(SendData, list)
+                else
+                    print("--- [5-E] 雖有 Table 但內容不符任務格式 ---")
+                end
+            else
+                print("--- [5-F] 回傳值類型為: " .. type(result))
+            end
+        end
+    end
+    
+    return result
+end)
