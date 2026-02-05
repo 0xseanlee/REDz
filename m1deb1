@@ -1,0 +1,48 @@
+local VIM = game:GetService("VirtualInputManager")
+local camera = workspace.CurrentCamera
+local player = game.Players.LocalPlayer
+
+-- --- UI 顯示狀態 ---
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local statusLabel = Instance.new("TextLabel", screenGui)
+statusLabel.Size = UDim2.new(0, 200, 0, 50)
+statusLabel.Position = UDim2.new(0.5, -100, 0, 50)
+statusLabel.Text = "VIM AUTO CLICK: RUNNING"
+statusLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+statusLabel.TextColor3 = Color3.new(0, 1, 0)
+Instance.new("UICorner", statusLabel)
+
+_G.AutoClick = true
+
+-- --- 核心點擊函數 ---
+local function PerformVIMAttack()
+    local screenSize = camera.ViewportSize
+    local centerX = screenSize.X / 2
+    local centerY = screenSize.Y / 2
+
+    -- 模擬滑鼠左鍵按下 (0 代表左鍵, true 代表按下)
+    VIM:HandleMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+    
+    -- 隨機極短延遲 (模擬物理按壓時長)
+    task.wait(math.random(10, 30) / 1000) 
+    
+    -- 模擬滑鼠左鍵放開 (false 代表放開)
+    VIM:HandleMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+end
+
+-- --- 主循環 ---
+task.spawn(function()
+    while _G.AutoClick do
+        -- 確保角色活著且手上有拿東西 (選用)
+        local char = player.Character
+        if char and char:FindFirstChildOfClass("Tool") then
+            PerformVIMAttack()
+        end
+        
+        -- 控制攻速：CDK/Godhuman 建議在 0.2s ~ 0.5s 之間
+        -- 這裡設定隨機間隔，讓行為更像真人
+        task.wait(math.random(350, 500) / 1000) 
+    end
+end)
+
+print("VIM Auto Clicker Started!")
