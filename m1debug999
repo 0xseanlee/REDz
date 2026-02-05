@@ -1,0 +1,50 @@
+--// 服務定義
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+--// [功能] 執行 M1 攻擊邏輯
+--// 邏輯：檢查工具 -> 模擬點擊 -> 發送武器切換封包重置狀態
+local function Do_M1_Attack()
+    local Character = LocalPlayer.Character
+    if Character and Character:FindFirstChildOfClass("Tool") then
+        -- 1. 模擬點擊行為 (CaptureController 確保輸入有效)
+        VirtualUser:CaptureController()
+        -- 點擊螢幕特定座標並參考當前攝像頭 CFrame
+        VirtualUser:ClickButton1(Vector2.new(851, 158), game.Workspace.CurrentCamera.CFrame)
+        
+        -- 2. 觸發伺服器端的攻擊重置事件 (利用 weaponChange 繞過冷卻)
+        local CombatEvent = ReplicatedStorage:FindFirstChild("RigControllerEvent")
+        if CombatEvent then
+            CombatEvent:FireServer("weaponChange")
+        end
+    end
+end
+
+--// [功能] 自動 M1 循環控制
+--// 邏輯：透過 _G.AutoAttack 布林值控制 task.spawn 線程
+local function Auto_M1_Enable(enabled)
+    _G.AutoAttack = enabled
+    
+    -- 只有在開啟時才啟動線程，避免重複啟動多個循環
+    if enabled then
+        task.spawn(function()
+            while _G.AutoAttack do
+                -- 執行核心攻擊邏輯
+                Do_M1_Attack()
+                
+                -- 依據混淆代碼中的常見間隔進行等待
+                task.wait(0.1) 
+            end
+        end)
+    end
+end
+
+--// [執行] 啟動腳本
+-- 直接呼叫開啟自動攻擊
+Auto_M1_Enable(true)
+
+-- 輸出提示
+print("M1 腳本已依照指定邏輯啟動")
+print("目前狀態: " .. tostring(_G.AutoAttack))
