@@ -1,0 +1,43 @@
+--// 定義服務
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+--// [核心函數] 依照提供的邏輯觸發 M1
+local function Trigger_M1_Weapon_Attack()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local weapon = character:FindFirstChildOfClass("Tool") -- 獲取當前武器
+
+    if weapon then
+        -- 獲取遠端事件
+        local remote = ReplicatedStorage:FindFirstChild("RigControllerEvent")
+        
+        if remote then
+            -- 邏輯 1: 提交武器狀態封包 (重置冷卻的關鍵)
+            -- 這裡原封不動保留 "weaponChange" 與武器名稱轉換
+            remote:FireServer("weaponChange", tostring(weapon)) 
+        end
+        
+        -- 邏輯 2: 模擬點擊 (座標 0,0)
+        -- 確保 CaptureController 已激活，防止點擊無效
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton1(Vector2.new(0, 0))
+    end
+end
+
+--// [執行邏輯] 使用快速循環達成自動普攻
+_G.FastM1 = true -- 開關
+
+task.spawn(function()
+    while _G.FastM1 do
+        Trigger_M1_Weapon_Attack()
+        
+        -- 為了配合封包發送速度，通常等待時間會設得極短
+        task.wait(0.05) 
+    end
+end)
+
+print("封包型 M1 腳本已啟動 (Logic: weaponChange + Vector2(0,0))")
