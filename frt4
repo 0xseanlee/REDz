@@ -1,0 +1,97 @@
+local webhook_url = "https://discord.com/api/webhooks/1468906393732911158/DJ-MJe9W8gNe0lj9QyRdZ-TV6wCT43Z43Qo_Nze77PoyGhuC5J4wjK78adrw1fFt9bW4"
+local player = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local function autoPickSide()
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+        local mainGui = player.PlayerGui:FindFirstChild("Main")
+        if mainGui and mainGui:FindFirstChild("ChooseTeam") then
+            local piratesBtn = mainGui.ChooseTeam.Container.Pirates.Frame.ViewportFrame.TextButton
+            if getconnections then
+                for _, v in pairs(getconnections(piratesBtn.MouseButton1Click)) do v:Fire() end
+            end
+        end
+    end)
+end
+
+local function sendWebhook(title, desc, color)
+    local req = syn and syn.request or http_request or request or (http and http.request)
+    if not req then return end
+    pcall(function()
+        req({
+            Url = webhook_url,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({
+                embeds = {{
+                    title = title,
+                    description = desc,
+                    color = color,
+                    footer = {text = "Server Time: " .. os.date("%X")},
+                    fields = {
+                        {name = "JobId", value = "```" .. game.JobId .. "```", inline = false},
+                        {name = "Players", value = #game.Players:GetChildren() .. "/" .. game.Players.MaxPlayers, inline = true}
+                    }
+                }}
+            })
+        })
+    end)
+end
+
+local function ServerHop()
+    local PlaceID = game.PlaceId
+    while task.wait(5) do 
+        pcall(function()
+            local Servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"))
+            local Possible = {}
+            for _, s in pairs(Servers.data) do
+                if s.playing < (s.maxPlayers - 1) and s.id ~= game.JobId then
+                    table.insert(Possible, s.id)
+                end
+            end
+            if #Possible > 0 then
+                TeleportService:TeleportToPlaceInstance(PlaceID, Possible[math.random(1, #Possible)], player)
+            end
+        end)
+    end
+end
+
+task.spawn(function()
+    if not game:IsLoaded() then game.Loaded:Wait() end
+    task.wait(2)
+    repeat autoPickSide(); task.wait(2) until player.Team ~= nil or (player.Character and player.Character:FindFirstChild("HumanoidRootPart"))
+    
+    task.wait(3)
+    local fruits = {}
+    for _, obj in pairs(game.Workspace:GetChildren()) do
+        if obj:IsA("Tool") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
+            table.insert(fruits, obj)
+        end
+    end
+    
+    if #fruits > 0 then
+        sendWebhook("🌟 Fruit Detected!", "Found " .. #fruits .. " fruit(s).", 65280)
+        for _, fruit in pairs(fruits) do
+            local h = fruit:FindFirstChild("Handle") or fruit:FindFirstChildOfClass("Part")
+            if h then
+                local tw = TweenService:Create(player.Character.HumanoidRootPart, TweenInfo.new((player.Character.HumanoidRootPart.Position - h.Position).Magnitude/300, Enum.EasingStyle.Linear), {CFrame = h.CFrame})
+                tw:Play(); tw.Completed:Wait()
+                task.wait(1.5)
+                local fName = fruit.Name
+                pcall(function()
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("StoreFruit", fName, player.Character:FindFirstChild(fName))
+                end)
+                sendWebhook("🍎 Stored Success", "**" .. fName .. "** has been added to inventory.", 16776960)
+            end
+        end
+    else
+        sendWebhook("🔍 Empty Server", "No fruits found. Moving on...", 16711680)
+    end
+    
+    task.wait(2)
+    ServerHop()
+end)
