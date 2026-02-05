@@ -1,0 +1,120 @@
+-- [[ 系統服務設定 ]]
+local webhook_url = "https://discord.com/api/webhooks/1468906393732911158/DJ-MJe9W8gNe0lj9QyRdZ-TV6wCT43Z43Qo_Nze77PoyGhuC5J4wjK78adrw1fFt9bW4"
+local player = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- --- 1. 自動選擇海賊 (Auto Pick Side) ---
+local function autoPickSide()
+    local success, err = pcall(function()
+        if not player:FindFirstChild("DataLoaded") then
+            -- 呼叫遊戲內部的選邊協議，直接加入海賊
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+        end
+    end)
+    return success
+end
+
+-- --- Discord 發送函數 ---
+local function sendWebhook(title, description, color)
+    local request_func = syn and syn.request or http_request or request or (http and http.request)
+    if not request_func then return end
+
+    local data = {
+        ["embeds"] = {{
+            ["title"] = title,
+            ["description"] = description,
+            ["color"] = color or 16711680,
+            ["footer"] = {["text"] = "伺服器時間: " .. os.date("%X")},
+            ["fields"] = {
+                {["name"] = "伺服器 ID", ["value"] = "```" .. game.JobId .. "```", ["inline"] = false},
+                {["name"] = "玩家人數", ["value"] = #game.Players:GetChildren() .. "/" .. game.Players.MaxPlayers, ["inline"] = true}
+            }
+        }}
+    }
+
+    pcall(function()
+        request_func({
+            Url = webhook_url,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
+end
+
+-- --- 自動換服函數 ---
+local function ServerHop()
+    local PlaceID = game.PlaceId
+    pcall(function()
+        local Servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"))
+        for _, s in pairs(Servers.data) do
+            if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(PlaceID, s.id, player)
+                break
+            end
+        end
+    end)
+end
+
+-- --- 平滑飛行 ---
+local function teleport(targetCFrame)
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local dist = (char.HumanoidRootPart.Position - targetCFrame.Position).Magnitude
+    local speed = 300
+    local tween = TweenService:Create(char.HumanoidRootPart, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    tween:Play()
+    return tween
+end
+
+-- --- 主執行邏輯 ---
+task.spawn(function()
+    -- A. 等待遊戲載入並自動選邊
+    repeat task.wait() until game:IsLoaded()
+    task.wait(2)
+    autoPickSide()
+    
+    -- B. 等待角色生成
+    repeat task.wait() until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    task.wait(3) 
+    
+    -- C. 掃描果實
+    local fruits = {}
+    for _, obj in pairs(game.Workspace:GetChildren()) do
+        if obj:IsA("Tool") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
+            table.insert(fruits, obj)
+        end
+    end
+    
+    -- D. 根據掃描結果行動
+    if #fruits > 0 then
+        sendWebhook("🌟 發現果實！", "此伺服器有 **" .. #fruits .. "** 個果實，正在前往撿取...", 65280)
+        
+        for _, fruit in pairs(fruits) do
+            local handle = fruit:FindFirstChild("Handle") or fruit:FindFirstChildOfClass("Part")
+            if handle then
+                local tw = teleport(handle.CFrame)
+                if tw then tw.Completed:Wait() end
+                
+                task.wait(1.5) -- 物理碰觸
+                
+                local fruitName = fruit.Name
+                pcall(function()
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("StoreFruit", fruitName, player.Character:FindFirstChild(fruitName))
+                end)
+                
+                sendWebhook("🍎 成功收入背包", "已存入果實: **" .. fruitName .. "**", 16776960)
+                task.wait(1)
+            end
+        end
+    else
+        sendWebhook("🔍 掃描完畢", "此伺服器無果實，即將自動換服。", 16711680)
+    end
+    
+    -- E. 結束後換服
+    task.wait(3)
+    ServerHop()
+end)
