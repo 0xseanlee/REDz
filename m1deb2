@@ -1,0 +1,48 @@
+--// 設定
+local Settings = {
+    Enabled = true,
+    AttackDistance = 50, -- 擴大攻擊範圍 (Hitbox)
+    FastAttack = true,   -- 開啟快速攻擊
+    ClickDelay = 0.1     -- 攻擊頻率 (秒)，越小越快，但過小可能被踢出
+}
+
+--// 獲取遊戲戰鬥框架
+local function GetCombatFramework()
+    local player = game:GetService("Players").LocalPlayer
+    local combatModule = player.PlayerScripts:WaitForChild("CombatFramework")
+    -- 使用 debug 獲取隱藏的控制變量
+    local setupValue = debug.getupvalues(require(combatModule))[2]
+    return setupValue
+end
+
+--// 自動攻擊主邏輯
+task.spawn(function()
+    local CombatFramework = GetCombatFramework()
+    
+    while true do
+        task.wait(Settings.ClickDelay)
+        
+        if Settings.Enabled and CombatFramework and CombatFramework.activeController then
+            local controller = CombatFramework.activeController
+            
+            -- 1. 修改攻擊範圍
+            controller.hitboxMagnitude = Settings.AttackDistance
+            
+            -- 2. 執行攻擊動作
+            -- 調用內部 attack 繞過冷卻計時器
+            if Settings.FastAttack then
+                -- 重置連擊段數，達成無限連打
+                controller.attack() 
+            else
+                controller:attack()
+            end
+            
+            -- 3. 強制向伺服器發送傷害判定 (RigControllerEvent)
+            -- 這是確保「有打中」的關鍵
+            local remote = game:GetService("ReplicatedStorage").RigControllerEvent
+            remote:FireServer("hit", {}, {}) -- 視情況填入目標數據
+        end
+    end
+end)
+
+print("M1 自動普攻已啟動！")
