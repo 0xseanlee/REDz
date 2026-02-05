@@ -1,0 +1,95 @@
+local player = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+-- --- UI 建立 ---
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FruitFinder_UI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 180, 0, 50)
+btn.Position = UDim2.new(0, 40, 0.5, 0)
+btn.Text = "AUTO FRUIT: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 18
+btn.Parent = screenGui
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+-- --- 核心變數 ---
+_G.AutoFruit = false
+
+btn.MouseButton1Click:Connect(function()
+    _G.AutoFruit = not _G.AutoFruit
+    btn.Text = _G.AutoFruit and "AUTO FRUIT: ON" or "AUTO FRUIT: OFF"
+    btn.BackgroundColor3 = _G.AutoFruit and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(40, 40, 40)
+end)
+
+-- --- 平滑移動 (Tween) 函數 ---
+local function teleport(targetCFrame)
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local dist = (char.HumanoidRootPart.Position - targetCFrame.Position).Magnitude
+    local speed = 300 -- 移動速度，不宜太快以免被反作弊踢出
+    local tweenInfo = TweenInfo.new(dist / speed, Enum.EasingStyle.Linear)
+    
+    local tween = TweenService:Create(char.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+    tween:Play()
+    return tween
+end
+
+-- --- 尋找並撿起果實 ---
+task.spawn(function()
+    while true do
+        if _G.AutoFruit then
+            pcall(function()
+                local foundFruit = false
+                
+                -- 遍歷工作區寻找果實
+                for _, obj in pairs(game.Workspace:GetChildren()) do
+                    -- Blox Fruits 生成的果實通常帶有 "Fruit" 名稱且有 Handle
+                    if obj:IsA("Tool") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
+                        foundFruit = true
+                        local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildOfClass("Part")
+                        
+                        if handle then
+                            print("🍎 發現果實: " .. obj.Name .. "，正在前往...")
+                            
+                            -- 1. 移動到果實位置
+                            local tw = teleport(handle.CFrame)
+                            if tw then tw.Completed:Wait() end
+                            
+                            -- 2. 到達後稍等，確保觸發撿取判定
+                            task.wait(0.3)
+                            
+                            -- 3. 如果果實還在地上，嘗試直接接觸
+                            if obj.Parent == game.Workspace then
+                                player.Character.HumanoidRootPart.CFrame = handle.CFrame
+                            end
+                        end
+                    end
+                end
+                
+                if not foundFruit then
+                    -- print("⌛ 目前地圖上沒有果實...")
+                end
+            end)
+        end
+        task.wait(5) -- 每 5 秒掃描一次全地圖，節省效能
+    end
+end)
+
+-- --- 防掉落/防卡住 ---
+RunService.Stepped:Connect(function()
+    if _G.AutoFruit then
+        local char = player.Character
+        if char and char:FindFirstChild("Humanoid") then
+            -- 飛行時防止角色掉入虛空或被重力干擾
+            char.Humanoid:ChangeState(11) 
+        end
+    end
+end)
